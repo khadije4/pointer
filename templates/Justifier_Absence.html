@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="Justifier_Absence.css">
+    <title>Justifier Absence - Gestion de Pointage</title>
+</head>
+
+<body>
+    <div class="header">
+        <div class="welcome">
+            <h1>Justifier Absence</h1>
+            <p>Soumettre un justificatif d'absence - <span id="studentName">Chargement...</span></p>
+        </div>
+        <a href="etudiant_dashboard.html" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Retour au Dashboard
+        </a>
+    </div>
+
+    <!-- Notifications -->
+    <div class="notification info">
+        <i class="fas fa-info-circle"></i>
+        <div class="notification-content">
+            <h4>Information importante</h4>
+            <p>Vous avez <strong>48 heures</strong> pour justifier une absence après la date du cours.</p>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <!-- Formulaire de justification -->
+        <div class="form-container">
+            <div class="form-header">
+                <h2><i class="fas fa-file-medical"></i> Nouveau Justificatif</h2>
+                <p>Remplissez le formulaire ci-dessous pour justifier votre absence</p>
+            </div>
+
+            <form id="absenceForm" class="absence-form">
+                <!-- Sélection du cours -->
+                <div class="form-group">
+                    <label for="courseSelect">
+                        <i class="fas fa-book"></i> Cours concerné *
+                    </label>
+                    <select id="courseSelect" name="attendance_id" required>
+                        <option value="">Chargement des cours...</option>
+                    </select>
+                </div>
+
+                <!-- Type de justificatif -->
+                <div class="form-group">
+                    <label for="reasonSelect">
+                        <i class="fas fa-clipboard-list"></i> Type de justificatif *
+                    </label>
+                    <select id="reasonSelect" name="reason_type" required onchange="toggleCustomReason()">
+                        <option value="">Sélectionnez le type</option>
+                        <option value="medical">Certificat médical</option>
+                        <option value="family">Urgence familiale</option>
+                        <option value="transport">Problème de transport</option>
+                        <option value="administrative">Démarche administrative</option>
+                        <option value="other">Autre (préciser)</option>
+                    </select>
+                </div>
+
+                <!-- Raison personnalisée -->
+                <div class="form-group" id="customReasonGroup" style="display: none;">
+                    <label for="customReason">
+                        <i class="fas fa-pen"></i> Précisez la raison
+                    </label>
+                    <input type="text" id="customReason" name="custom_reason" placeholder="Décrivez brièvement la raison...">
+                </div>
+
+                <!-- Description détaillée -->
+                <div class="form-group">
+                    <label for="description">
+                        <i class="fas fa-align-left"></i> Description détaillée *
+                    </label>
+                    <textarea id="description" name="description" rows="4" required 
+                              placeholder="Expliquez les circonstances de votre absence en détail..."></textarea>
+                    <div class="char-counter">
+                        <span id="charCount">0</span>/500 caractères
+                    </div>
+                </div>
+
+                <!-- Upload de fichier -->
+                <div class="form-group">
+                    <label for="fileUpload">
+                        <i class="fas fa-paperclip"></i> Pièce justificative (optionnel)
+                    </label>
+                    <div class="file-upload-area" onclick="document.getElementById('fileUpload').click()">
+                        <div class="upload-content">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Cliquez pour sélectionner un fichier</p>
+                            <span>PDF, JPG, PNG (Max: 5MB)</span>
+                        </div>
+                        <input type="file" id="fileUpload" name="document" accept=".pdf,.jpg,.jpeg,.png" style="display: none;">
+                    </div>
+                    <div id="fileInfo" class="file-info" style="display: none;"></div>
+                </div>
+
+                <!-- Date de soumission -->
+                <div class="form-group">
+                    <label>
+                        <i class="fas fa-calendar"></i> Date de soumission
+                    </label>
+                    <input type="text" id="submissionDate" readonly class="readonly-field">
+                </div>
+
+                <!-- Boutons d'action -->
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="resetForm()">
+                        <i class="fas fa-undo"></i> Réinitialiser
+                    </button>
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-paper-plane"></i> Soumettre le Justificatif
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Historique des justificatifs -->
+        <div class="history-container">
+            <div class="history-header">
+                <h2><i class="fas fa-history"></i> Historique des Justificatifs</h2>
+            </div>
+
+            <div class="history-list" id="historyList">
+                <div class="loading">Chargement de l'historique...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmation -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-check-circle"></i> Justificatif Soumis</h3>
+            </div>
+            <div class="modal-body">
+                <p>Votre justificatif d'absence a été soumis avec succès !</p>
+                <p>Vous recevrez une notification une fois qu'il sera traité par l'administration.</p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="closeModal()">Compris</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = '';
+        let studentData = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            setCurrentDate();
+            loadStudentInfo();
+            loadAbsentCourses();
+            loadJustificationHistory();
+        });
+
+        // Set current date
+        function setCurrentDate() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('fr-FR', { 
+                day: '2-digit', 
+                month: 'long', 
+                year: 'numeric' 
+            });
+            document.getElementById('submissionDate').value = dateStr;
+        }
+
+        // Load student info
+        async function loadStudentInfo() {
+            try {
+                const response = await fetch('/api/student_info');
+                if (response.ok) {
+                    const data = await response.json();
+                    studentData = data;
+                    document.getElementById('studentName').textContent = `${data.prenom} ${data.nom} - ${data.classe || 'MIAGE L2'}`;
+                } else {
+                    console.error('Failed to load student info');
+                }
+            } catch (error) {
+                console.error('Error loading student info:', error);
+            }
+        }
+
+        // Load absent courses that can be justified
+        async function loadAbsentCourses() {
+            try {
+                const response = await fetch('/api/student_absent_courses');
+                if (response.ok) {
+                    const courses = await response.json();
+                    const courseSelect = document.getElementById('courseSelect');
+                    courseSelect.innerHTML = '<option value="">Sélectionnez le cours</option>';
+                    
+                    courses.forEach(course => {
+                        const option = document.createElement('option');
+                        option.value = course.attendance_id;
+                        option.textContent = `${course.nom_cours} - ${formatDate(course.date_presence)} - ${formatTime(course.heure_presence)}`;
+                        courseSelect.appendChild(option);
+                    });
+                    
+                    if (courses.length === 0) {
+                        courseSelect.innerHTML = '<option value="">Aucune absence à justifier</option>';
+                    }
+                } else {
+                    console.error('Failed to load absent courses');
+                }
+            } catch (error) {
+                console.error('Error loading absent courses:', error);
+            }
+        }
+
+        // Load justification history
+        async function loadJustificationHistory() {
+            try {
+                const response = await fetch('/api/student_justifications');
+                if (response.ok) {
+                    const justifications = await response.json();
+                    displayJustificationHistory(justifications);
+                } else {
+                    document.getElementById('historyList').innerHTML = '<div class="no-data">Erreur lors du chargement</div>';
+                }
+            } catch (error) {
+                console.error('Error loading justification history:', error);
+                document.getElementById('historyList').innerHTML = '<div class="no-data">Erreur lors du chargement</div>';
+            }
+        }
+
+        // Display justification history
+        function displayJustificationHistory(justifications) {
+            const historyList = document.getElementById('historyList');
+            
+            if (justifications.length === 0) {
+                historyList.innerHTML = '<div class="no-data">Aucun justificatif soumis</div>';
+                return;
+            }
+
+            historyList.innerHTML = justifications.map(just => `
+                <div class="history-item">
+                    <div class="history-status status-${getStatusClass(just.status)}">
+                        <i class="fas fa-${getStatusIcon(just.status)}"></i>
+                    </div>
+                    <div class="history-details">
+                        <h4>${just.nom_cours}</h4>
+                        <p><i class="fas fa-calendar"></i> ${formatDate(just.date_presence)} - ${formatTime(just.heure_presence)}</p>
+                        <p><i class="fas fa-tag"></i> ${getReasonLabel(just.reason_type, just.custom_reason)}</p>
+                        <span class="status-badge status-${getStatusClass(just.status)}">${getStatusLabel(just.status)}</span>
+                    </div>
+                    <div class="history-actions">
+                        <button class="btn-icon" title="Voir détails" onclick="viewJustificationDetails(${just.id})">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${just.status === 'refusee' ? `
+                            <button class="btn-icon" title="Refaire une demande" onclick="retryJustification(${just.attendance_id})">
+                                <i class="fas fa-redo"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Helper functions for display
+        function getStatusClass(status) {
+            switch(status) {
+                case 'en_attente': return 'pending';
+                case 'validee': return 'approved';
+                case 'refusee': return 'rejected';
+                default: return 'pending';
+            }
+        }
+
+        function getStatusIcon(status) {
+            switch(status) {
+                case 'en_attente': return 'clock';
+                case 'validee': return 'check';
+                case 'refusee': return 'times';
+                default: return 'clock';
+            }
+        }
+
+        function getStatusLabel(status) {
+            switch(status) {
+                case 'en_attente': return 'En attente';
+                case 'validee': return 'Approuvé';
+                case 'refusee': return 'Refusé';
+                default: return 'En attente';
+            }
+        }
+
+        function getReasonLabel(reasonType, customReason) {
+            const reasonLabels = {
+                'medical': 'Certificat médical',
+                'family': 'Urgence familiale',
+                'transport': 'Problème de transport',
+                'administrative': 'Démarche administrative',
+                'other': customReason || 'Autre'
+            };
+            return reasonLabels[reasonType] || reasonType;
+        }
+
+        function formatDate(dateStr) {
+            return new Date(dateStr).toLocaleDateString('fr-FR');
+        }
+
+        function formatTime(timeStr) {
+            return timeStr ? timeStr.substring(0, 5) : '';
+        }
+
+        // Form handling
+        document.getElementById('description').addEventListener('input', function() {
+            const charCount = this.value.length;
+            document.getElementById('charCount').textContent = charCount;
+            
+            if (charCount > 500) {
+                this.value = this.value.substring(0, 500);
+                document.getElementById('charCount').textContent = 500;
+            }
+        });
+
+        document.getElementById('fileUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const fileInfo = document.getElementById('fileInfo');
+            
+            if (file) {
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                fileInfo.innerHTML = `
+                    <div class="file-selected">
+                        <i class="fas fa-file"></i>
+                        <span>${file.name} (${fileSize} MB)</span>
+                        <button type="button" onclick="removeFile()"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
+                fileInfo.style.display = 'block';
+            }
+        });
+
+        function removeFile() {
+            document.getElementById('fileUpload').value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+        }
+
+        function toggleCustomReason() {
+            const reasonSelect = document.getElementById('reasonSelect');
+            const customReasonGroup = document.getElementById('customReasonGroup');
+            
+            if (reasonSelect.value === 'other') {
+                customReasonGroup.style.display = 'block';
+                document.getElementById('customReason').required = true;
+            } else {
+                customReasonGroup.style.display = 'none';
+                document.getElementById('customReason').required = false;
+            }
+        }
+
+        function resetForm() {
+            if (confirm('Êtes-vous sûr de vouloir réinitialiser le formulaire ?')) {
+                document.getElementById('absenceForm').reset();
+                document.getElementById('customReasonGroup').style.display = 'none';
+                document.getElementById('fileInfo').style.display = 'none';
+                document.getElementById('charCount').textContent = '0';
+            }
+        }
+
+        // Form submission
+        document.getElementById('absenceForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            // Validation
+            const attendanceId = formData.get('attendance_id');
+            const reasonType = formData.get('reason_type');
+            const description = formData.get('description');
+            
+            if (!attendanceId || !reasonType || !description.trim()) {
+                alert('Veuillez remplir tous les champs obligatoires.');
+                return;
+            }
+            
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Envoi en cours...';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/submit_justification', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    document.getElementById('confirmModal').style.display = 'flex';
+                    loadJustificationHistory(); // Refresh history
+                    loadAbsentCourses(); // Refresh course list
+                } else {
+                    alert(result.message || 'Erreur lors de la soumission');
+                }
+            } catch (error) {
+                console.error('Error submitting justification:', error);
+                alert('Erreur lors de la soumission');
+            } finally {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+
+        function closeModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+            resetForm();
+        }
+
+        // View justification details
+        function viewJustificationDetails(justificationId) {
+            // You can implement a modal to show full details
+            console.log('View details for justification:', justificationId);
+        }
+
+        // Retry justification
+        function retryJustification(attendanceId) {
+            document.getElementById('courseSelect').value = attendanceId;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Animation d'entrée
+        window.addEventListener('load', () => {
+            const elements = document.querySelectorAll('.form-container, .history-container');
+            elements.forEach((element, index) => {
+                element.style.opacity = '0';
+                element.style.transform = 'translateY(20px)';
+                element.style.transition = 'all 0.6s ease';
+                
+                setTimeout(() => {
+                    element.style.opacity = '1';
+                    element.style.transform = 'translateY(0)';
+                }, index * 200);
+            });
+        });
+    </script>
+</body>
+</html>

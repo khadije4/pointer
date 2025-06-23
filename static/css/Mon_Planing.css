@@ -1,0 +1,243 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Montserrat', sans-serif;
+}
+
+body {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    padding: 15px;
+}
+
+/* Header */
+.header {
+    background: white;
+    border-radius: 20px;
+    padding: 25px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.header .welcome h1 {
+    font-size: 24px;
+    color: #00a86b;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.header .welcome p {
+    color: #666;
+    font-size: 14px;
+}
+
+.back-btn {
+    background: linear-gradient(135deg, #00a86b, #70c2a4);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.back-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 168, 107, 0.3);
+}
+
+/* Planning Container */
+.planning-container {
+    background: white;
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+    margin-bottom: 20px;
+}
+
+.planning-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.planning-title {
+    color: #00a86b;
+    font-size: 22px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.semester-info {
+    background: linear-gradient(135deg, #00a86b, #70c2a4);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+/* Schedule Table */
+.schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.schedule-table th {
+    background: linear-gradient(135deg, #00a86b, #70c2a4);
+    color: white;
+    padding: 15px 10px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.schedule-table td {
+    padding: 12px 8px;
+    text-align: center;
+    border: 1px solid #e9ecef;
+    vertical-align: middle;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.schedule-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+.schedule-table tbody tr:hover {
+    background-color: rgba(0, 168, 107, 0.05);
+    transition: all 0.3s ease;
+}
+
+.time-slot {
+    background: #00a86b !important;
+    color: white !important;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.course-cell {
+    font-weight: 500;
+    color: #333;
+    position: relative;
+}
+
+.course-name {
+    font-weight: 600;
+    color: #00a86b;
+    margin-bottom: 2px;
+}
+
+.course-location {
+    color: #666;
+    font-size: 11px;
+}
+
+.course-type {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-top: 3px;
+}
+
+.type-cours {
+    background: rgba(0, 168, 107, 0.1);
+    color: #00a86b;
+}
+
+.type-tp {
+    background: rgba(255, 193, 7, 0.2);
+    color: #856404;
+}
+
+.type-td {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+/* Stats Cards */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    text-align: center;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);
+    border-left: 4px solid #00a86b;
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-number {
+    font-size: 28px;
+    font-weight: 700;
+    color: #00a86b;
+    margin-bottom: 8px;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .schedule-table {
+        font-size: 10px;
+    }
+    
+    .schedule-table th,
+    .schedule-table td {
+        padding: 8px 4px;
+    }
+    
+    .planning-container {
+        padding: 20px;
+        overflow-x: auto;
+    }
+    
+    .schedule-table {
+        min-width: 700px;
+    }
+}
+
+.empty-cell {
+    background: #f8f9fa;
+    color: #999;
+}

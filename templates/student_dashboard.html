@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/student_dashboard.css') }}">
+    <title>Dashboard Étudiant - Gestion de Pointage</title>
+
+</head>
+<body>
+    <div class="header">
+        <div class="welcome">
+            <h1>Tableau de Bord</h1>
+            <p>Bienvenue, {{ session.user_name }} - Matricule: {{ session.matricule }}</p>
+        </div>
+        <div class="user-info">
+            <i class="fas fa-user-circle"></i>
+            <span>Étudiant</span>
+        </div>
+        <form action="{{ url_for('logout') }}" method="get" style="display: inline;">
+            <button type="submit" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i> Déconnexion 
+            </button>
+        </form>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'error' }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="notification">
+        <i class="fas fa-info-circle"></i>
+        <div class="notification-content">
+            <h4>Information</h4>
+            <p>N'oubliez pas de scanner le QR code pour marquer votre présence à chaque cours.</p>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- Circular Progress Card -->
+        <div class="presence-card">
+            <div class="circular-progress">
+                <svg>
+                    <defs>
+                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#00a86b"/>
+                            <stop offset="100%" style="stop-color:#70c2a4"/>
+                        </linearGradient>
+                    </defs>
+                    <circle class="bg-circle" cx="75" cy="75" r="70"></circle>
+                    <circle class="progress-circle" cx="75" cy="75" r="70"></circle>
+                </svg>
+                <div class="progress-text" id="attendance-percentage">
+                    {% if stats and stats.total_courses > 0 %}
+                        {{ "%.0f"|format((stats.present_count / stats.total_courses) * 100) }}%
+                    {% else %}
+                        0%
+                    {% endif %}
+                </div>
+            </div>
+            <h3 class="presence-title">Taux de Présence</h3>
+            <p class="presence-subtitle">
+                {% if stats %}
+                    {{ stats.present_count }}/{{ stats.total_courses }} cours
+                {% else %}
+                    Aucun cours
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- QR Scanner -->
+        <div class="qr-card">
+            <h2><i class="fas fa-qrcode"></i> Scanner QR</h2>
+            <p style="color: #666; margin-bottom: 20px;">Scannez le code pour marquer votre présence</p>
+            
+            <div class="qr-scanner" onclick="openQRInput()">
+                <i class="fas fa-qrcode"></i>
+            </div>
+            
+            <button class="scan-btn" onclick="openQRInput()">
+                <i class="fas fa-keyboard"></i> Saisir Code QR
+            </button>
+            
+            <div id="scan-result" style="margin-top: 15px; font-weight: 600;"></div>
+            
+            
+            <div id="qr-input-container" style="display: none; margin-top: 20px;">
+                <input type="text" id="qr-input" placeholder="Entrez le code QR" style="
+                    width: 100%;
+                    padding: 12px;
+                    border: 2px solid #ddd;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    text-align: center;
+                    text-transform: uppercase;
+                    margin-bottom: 10px;
+                ">
+                <button onclick="submitQRCode()" style="
+                    background: #00a86b;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    margin-right: 10px;
+                ">Valider</button>
+                <button onclick="cancelQRInput()" style="
+                    background: #666;
+                    color: white;
+                    border: none;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                ">Annuler</button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.total_courses if stats else 0 }}</div>
+                <div class="stat-label">Cours total</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.present_count if stats else 0 }}</div>
+                <div class="stat-label">Présences</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.absent_count if stats else 0 }}</div>
+                <div class="stat-label">Absences</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activities -->
+    <div class="activities-card">
+        <h2><i class="fas fa-history"></i> Activités Récentes</h2>
+        
+        {% if recent_attendance %}
+            {% for attendance in recent_attendance[:5] %}
+                <div class="activity-item">
+                    <div class="activity-icon {{ 'present' if attendance.status == 'present' else 'absent' if attendance.status == 'absent' else 'justified' }}">
+                        {% if attendance.status == 'present' %}
+                            <i class="fas fa-check"></i>
+                        {% elif attendance.status == 'justified' %}
+                            <i class="fas fa-file-medical"></i>
+                        {% else %}
+                            <i class="fas fa-times"></i>
+                        {% endif %}
+                    </div>
+                    <div class="activity-details">
+                        <h4>{{ attendance.nom_cours }}</h4>
+                        <p>{{ attendance.date_presence }} {{ attendance.heure_presence.strftime('%H:%M') if attendance.heure_presence else '' }} - Prof. {{ attendance.prof_prenom }} {{ attendance.prof_nom }}</p>
+                    </div>
+                    <span class="status-badge status-{{ attendance.status }}">
+                        {% if attendance.status == 'present' %}
+                            Présent
+                        {% elif attendance.status == 'justified' %}
+                            Justifié
+                        {% else %}
+                            Absent
+                        {% endif %}
+                    </span>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="activity-item">
+                <div class="activity-details">
+                    <p style="color: #666; text-align: center;">Aucune activité récente</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="actions-grid">
+        <div class="action-card" onclick="window.location.href='{{ url_for('mes_presences') }}'">
+            <i class="fas fa-calendar-check"></i>
+            <h3>Mes Présences</h3>
+            <p>Consulter l'historique complet</p>
+        </div>
+        
+        <div class="action-card" onclick="window.location.href='{{ url_for('justifier_absence') }}'">
+            <i class="fas fa-file-medical"></i>
+            <h3>Justifier Absence</h3>
+            <p>Soumettre un justificatif</p>
+        </div>
+        
+        <div class="action-card" onclick="window.location.href='{{ url_for('mon_planning') }}'">
+            <i class="fas fa-clock"></i>
+            <h3>Mon Planning</h3>
+            <p>Voir les cours à venir</p>
+        </div>
+        
+        <div class="action-card" onclick="window.location.href='{{ url_for('student_profile') }}'">
+            <i class="fas fa-user-cog"></i>
+            <h3>Mon Profil</h3>
+            <p>Gérer mes informations</p>
+        </div>
+    </div>
+
+    <script>
+        // Animation du cercle de progression
+        window.addEventListener('load', () => {
+            const progressCircle = document.querySelector('.progress-circle');
+            const percentageText = document.getElementById('attendance-percentage').textContent;
+            const percentage = parseInt(percentageText);
+            const circumference = 2 * Math.PI * 70;
+            const offset = circumference - (percentage / 100) * circumference;
+            
+            setTimeout(() => {
+                progressCircle.style.strokeDashoffset = offset;
+            }, 500);
+        });
+
+        function openQRInput() {
+            document.getElementById('qr-input-container').style.display = 'block';
+            document.getElementById('qr-input').focus();
+        }
+
+        function cancelQRInput() {
+            document.getElementById('qr-input-container').style.display = 'none';
+            document.getElementById('qr-input').value = '';
+            document.getElementById('scan-result').innerHTML = '';
+        }
+
+        function submitQRCode() {
+            const qrToken = document.getElementById('qr-input').value.trim().toUpperCase();
+            const resultDiv = document.getElementById('scan-result');
+            
+            if (!qrToken) {
+                resultDiv.innerHTML = '<span style="color: #ff6b6b;"><i class="fas fa-exclamation-circle"></i> Veuillez entrer un code QR</span>';
+                return;
+            }
+
+            // Show loading
+            resultDiv.innerHTML = '<span style="color: #666;"><i class="fas fa-spinner fa-spin"></i> Vérification en cours...</span>';
+
+            // Send to backend
+            fetch('{{ url_for("scan_qr") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    qr_token: qrToken
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultDiv.innerHTML = `<span style="color: #00a86b;"><i class="fas fa-check-circle"></i> ${data.message}</span>`;
+                    // Refresh page after 2 seconds to update stats
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    resultDiv.innerHTML = `<span style="color: #ff6b6b;"><i class="fas fa-exclamation-circle"></i> ${data.error}</span>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                resultDiv.innerHTML = '<span style="color: #ff6b6b;"><i class="fas fa-exclamation-circle"></i> Erreur de connexion</span>';
+            });
+
+            // Hide input after submission
+            document.getElementById('qr-input-container').style.display = 'none';
+            document.getElementById('qr-input').value = '';
+        }
+
+        // Allow Enter key to submit QR code
+        document.getElementById('qr-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                submitQRCode();
+            }
+        });
+    </script>
+</body>
+
+</html>

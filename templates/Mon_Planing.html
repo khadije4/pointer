@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='Mon_Planing.css') }}">
+    <title>Mon Planning - Gestion de Pointage</title>
+</head>
+<body>
+    <div class="header">
+        <div class="welcome">
+            <h1>Mon Planning</h1>
+            <p>Emploi du temps - {{ student.prenom }} {{ student.nom }} - {{ student.classe }}</p>
+        </div>
+        <a href="{{ url_for('student_dashboard') }}" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Retour au Dashboard
+        </a>
+    </div>
+
+    <div class="planning-container">
+        <div class="planning-header">
+            <h2 class="planning-title">
+                <i class="fas fa-calendar-alt"></i>
+                Emploi du Temps
+            </h2>
+            <div class="semester-info">
+                {{ student.classe }} : Emploi du Temps S4
+            </div>
+        </div>
+
+        <table class="schedule-table">
+            <thead>
+                <tr>
+                    <th>Horaire</th>
+                    <th>Lundi</th>
+                    <th>Mardi</th>
+                    <th>Mercredi</th>
+                    <th>Jeudi</th>
+                    <th>Vendredi</th>
+                    <th>Samedi</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Time slots would be dynamically generated -->
+                {% for time_slot in [
+                    {'start': '8:30', 'end': '10:30'},
+                    {'start': '10:30', 'end': '12:30'},
+                    {'start': '12:30', 'end': '14:00'},
+                    {'start': '14:00', 'end': '16:00'},
+                    {'start': '16:00', 'end': '18:00'}
+                ] %}
+                <tr>
+                    <td class="time-slot">{{ time_slot.start }}-{{ time_slot.end }}</td>
+                    
+                    <!-- Monday -->
+                    <td class="{{ 'empty-cell' if not schedule.Monday[loop.index0] else 'course-cell' }}">
+                        {% if schedule.Monday[loop.index0] %}
+                        <div class="course-name">{{ schedule.Monday[loop.index0].course_name }}</div>
+                        <div class="course-location">Salle: {{ schedule.Monday[loop.index0].room }}</div>
+                        <span class="course-type type-{{ schedule.Monday[loop.index0].type|lower }}">{{ schedule.Monday[loop.index0].type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    
+                    <!-- Repeat for other days -->
+                    <!-- Tuesday -->
+                    <td class="{{ 'empty-cell' if not schedule.Tuesday[loop.index0] else 'course-cell' }}">
+                        {% if schedule.Tuesday[loop.index0] %}
+                        <div class="course-name">{{ schedule.Tuesday[loop.index0].course_name }}</div>
+                        <div class="course-location">Salle: {{ schedule.Tuesday[loop.index0].room }}</div>
+                        <span class="course-type type-{{ schedule.Tuesday[loop.index0].type|lower }}">{{ schedule.Tuesday[loop.index0].type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    
+                    <!-- Wednesday -->
+                    <td class="{{ 'empty-cell' if not schedule.Wednesday[loop.index0] else 'course-cell' }}">
+                        {% if schedule.Wednesday[loop.index0] %}
+                        <div class="course-name">{{ schedule.Wednesday[loop.index0].course_name }}</div>
+                        <div class="course-location">Salle: {{ schedule.Wednesday[loop.index0].room }}</div>
+                        <span class="course-type type-{{ schedule.Wednesday[loop.index0].type|lower }}">{{ schedule.Wednesday[loop.index0].type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    
+                    <!-- Thursday -->
+                    <td class="{{ 'empty-cell' if not schedule.Thursday[loop.index0] else 'course-cell' }}">
+                        {% if schedule.Thursday[loop.index0] %}
+                        <div class="course-name">{{ schedule.Thursday[loop.index0].course_name }}</div>
+                        <div class="course-location">Salle: {{ schedule.Thursday[loop.index0].room }}</div>
+                        <span class="course-type type-{{ schedule.Thursday[loop.index0].type|lower }}">{{ schedule.Thursday[loop.index0].type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    
+                    <!-- Friday -->
+                    <td class="{{ 'empty-cell' if not schedule.Friday[loop.index0] else 'course-cell' }}">
+                        {% if schedule.Friday[loop.index0] %}
+                        <div class="course-name">{{ schedule.Friday[loop.index0].course_name }}</div>
+                        <div class="course-location">Salle: {{ schedule.Friday[loop.index0].room }}</div>
+                        <span class="course-type type-{{ schedule.Friday[loop.index0].type|lower }}">{{ schedule.Friday[loop.index0].type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    
+                    <!-- Saturday -->
+                    <td class="{{ 'empty-cell' if not schedule.Saturday[loop.index0] else 'course-cell' }}">
+                        {% if schedule.Saturday[loop.index0] %}
+                        <div class="course-name">{{ schedule.Saturday[loop.index0].course_name }}</div>
+                        <div class="course-location">Salle: {{ schedule.Saturday[loop.index0].room }}</div>
+                        <span class="course-type type-{{ schedule.Saturday[loop.index0].type|lower }}">{{ schedule.Saturday[loop.index0].type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ attendance_stats.total_courses }}</div>
+            <div class="stat-label">Sessions de cours</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ courses|length }}</div>
+            <div class="stat-label">Matières au total</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ unique_rooms|length }}</div>
+            <div class="stat-label">Salles différentes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ unique_labs|length }}</div>
+            <div class="stat-label">Laboratoires utilisés</div>
+        </div>
+    </div>
+
+    <script>
+        // Your existing JavaScript can remain the same
+        // It will work with the dynamically generated HTML
+        window.addEventListener('load', () => {
+            const cards = document.querySelectorAll('.stat-card');
+            cards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateY(20px)';
+                    card.style.transition = 'all 0.5s ease';
+                    
+                    setTimeout(() => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'translateY(0)';
+                    }, 100);
+                }, index * 100);
+            });
+        });
+
+        function highlightCurrentClass() {
+            // Your existing highlight function
+        }
+        
+        highlightCurrentClass();
+    </script>
+</body>
+</html>

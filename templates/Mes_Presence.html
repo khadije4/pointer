@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="Mes_Presence.css">
+    <title>Mes Présences - Gestion de Pointage</title>
+</head>
+
+<body>
+    <div class="header">
+        <div class="welcome">
+            <h1>Mes Présences</h1>
+            <p>Historique de présence - {{ session.user_name }} - {{ student_info.classe if student_info else 'N/A' }}</p>
+        </div>
+        <a href="{{ url_for('student_dashboard') }}" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Retour au Dashboard
+        </a>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">
+                        {{ message }}
+                        <button onclick="this.parentElement.remove()" class="close-btn">&times;</button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Stats Overview -->
+    <div class="stats-overview">
+        <div class="overview-card">
+            <div class="overview-icon">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="overview-content">
+                <h3>{{ attendance_rate }}%</h3>
+                <p>Taux de Présence Global</p>
+            </div>
+            <div class="overview-trend {{ 'up' if attendance_trend > 0 else 'down' if attendance_trend < 0 else 'neutral' }}">
+                <i class="fas fa-arrow-{{ 'up' if attendance_trend > 0 else 'down' if attendance_trend < 0 else 'right' }}"></i> 
+                {{ attendance_trend if attendance_trend != 0 else '0' }}%
+            </div>
+        </div>
+
+        <div class="overview-card">
+            <div class="overview-icon absent">
+                <i class="fas fa-calendar-times"></i>
+            </div>
+            <div class="overview-content">
+                <h3>{{ stats.absent_count or 0 }}</h3>
+                <p>Total Absences</p>
+            </div>
+            <div class="overview-trend neutral">
+                <i class="fas fa-calendar-times"></i>
+            </div>
+        </div>
+
+        <div class="overview-card">
+            <div class="overview-icon justified">
+                <i class="fas fa-file-medical"></i>
+            </div>
+            <div class="overview-content">
+                <h3>{{ justified_count or 0 }}</h3>
+                <p>Absences Justifiées</p>
+            </div>
+            <div class="overview-trend neutral">
+                <i class="fas fa-check-circle"></i>
+            </div>
+        </div>
+
+        <div class="overview-card">
+            <div class="overview-icon pending">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="overview-content">
+                <h3>{{ pending_count or 0 }}</h3>
+                <p>En Attente</p>
+            </div>
+            <div class="overview-trend neutral">
+                <i class="fas fa-hourglass-half"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="filters-section">
+        <div class="filters-card">
+            <h3><i class="fas fa-filter"></i> Filtres</h3>
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label for="month-filter">Mois</label>
+                    <select id="month-filter" onchange="applyFilters()">
+                        <option value="all">Tous les mois</option>
+                        <option value="1">Janvier</option>
+                        <option value="2">Février</option>
+                        <option value="3">Mars</option>
+                        <option value="4">Avril</option>
+                        <option value="5">Mai</option>
+                        <option value="6">Juin</option>
+                        <option value="7">Juillet</option>
+                        <option value="8">Août</option>
+                        <option value="9">Septembre</option>
+                        <option value="10">Octobre</option>
+                        <option value="11">Novembre</option>
+                        <option value="12">Décembre</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="subject-filter">Matière</label>
+                    <select id="subject-filter" onchange="applyFilters()">
+                        <option value="all">Toutes les matières</option>
+                        {% for course in courses %}
+                            <option value="{{ course.id }}">{{ course.nom_cours }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="status-filter">Statut</label>
+                    <select id="status-filter" onchange="applyFilters()">
+                        <option value="all">Tous les statuts</option>
+                        <option value="present">Présent</option>
+                        <option value="absent">Absent</option>
+                        <option value="justified">Justifié</option>
+                    </select>
+                </div>
+                <button class="reset-filters-btn" onclick="resetFilters()">
+                    <i class="fas fa-undo"></i> Réinitialiser
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Chart -->
+    <div class="chart-section">
+        <div class="chart-card">
+            <h3><i class="fas fa-chart-line"></i> Évolution Mensuelle</h3>
+            <div class="chart-container">
+                <canvas id="attendanceChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance History -->
+    <div class="history-section">
+        <div class="history-card">
+            <div class="history-header">
+                <h3><i class="fas fa-history"></i> Historique Détaillé</h3>
+                <div class="export-options">
+                    <button class="export-btn" onclick="exportToPDF()">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </button>
+                    <button class="export-btn" onclick="exportToExcel()">
+                        <i class="fas fa-file-excel"></i> Excel
+                    </button>
+                </div>
+            </div>
+
+            <div class="attendance-table-container">
+                <table class="attendance-table" id="attendanceTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Matière</th>
+                            <th>Professeur</th>
+                            <th>Horaire</th>
+                            <th>Statut</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in attendance_records %}
+                        <tr data-month="{{ record.date_presence.split('-')[1] if '-' in record.date_presence else record.date_presence.split('/')[1] }}" 
+                            data-course="{{ record.course_id }}" 
+                            data-status="{{ record.status }}">
+                            <td>{{ record.date_presence }}</td>
+                            <td>{{ record.nom_cours }}</td>
+                            <td>Prof. {{ record.prof_prenom }} {{ record.prof_nom }}</td>
+                            <td>{{ record.heure_presence if record.heure_presence else 'N/A' }}</td>
+                            <td>
+                                <span class="status-badge status-{{ record.status }}">
+                                    {% if record.status == 'present' %}
+                                        Présent
+                                    {% elif record.status == 'absent' %}
+                                        Absent
+                                    {% elif record.status == 'justified' %}
+                                        Justifié
+                                    {% else %}
+                                        {{ record.status }}
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                {% if record.status == 'present' or record.status == 'justified' %}
+                                    <button class="action-btn view-btn" onclick="viewDetails({{ record.id }})">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                {% elif record.status == 'absent' %}
+                                    <button class="action-btn justify-btn" onclick="justifyAbsence({{ record.id }})">
+                                        <i class="fas fa-file-medical"></i>
+                                    </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="no-data">Aucun enregistrement de présence trouvé</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if pagination %}
+            <div class="pagination">
+                {% if pagination.has_prev %}
+                    <button onclick="changePage({{ pagination.prev_num }})" class="page-btn">
+                        <i class="fas fa-chevron-left"></i> Précédent
+                    </button>
+                {% endif %}
+                
+                <span class="page-info">
+                    Page {{ pagination.page }} sur {{ pagination.pages }}
+                </span>
+                
+                {% if pagination.has_next %}
+                    <button onclick="changePage({{ pagination.next_num }})" class="page-btn">
+                        Suivant <i class="fas fa-chevron-right"></i>
+                    </button>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Justification Modal -->
+    <div id="justifyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-file-medical"></i> Justifier une Absence</h2>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <form id="justifyForm" enctype="multipart/form-data">
+                <input type="hidden" id="attendance_id" name="attendance_id">
+                
+                <div class="form-group">
+                    <label for="reason_type">Type de justification *</label>
+                    <select id="reason_type" name="reason_type" required>
+                        <option value="">Sélectionner un type</option>
+                        <option value="medical">Certificat médical</option>
+                        <option value="family">Raison familiale</option>
+                        <option value="transport">Problème de transport</option>
+                        <option value="administrative">Démarche administrative</option>
+                        <option value="other">Autre</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="custom_reason_group" style="display:none;">
+                    <label for="custom_reason">Préciser la raison</label>
+                    <input type="text" id="custom_reason" name="custom_reason" placeholder="Précisez la raison...">
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description détaillée *</label>
+                    <textarea id="description" name="description" required placeholder="Décrivez les circonstances de votre absence..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="document">Document justificatif</label>
+                    <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png">
+                    <small>Formats acceptés: PDF, JPG, PNG (Max: 5MB)</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" onclick="closeModal()" class="btn-cancel">Annuler</button>
+                    <button type="submit" class="btn-submit">
+                        <i class="fas fa-paper-plane"></i> Soumettre
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let attendanceChart;
+        let currentAttendanceId = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            initChart();
+            setupEventListeners();
+            loadAttendanceData();
+        });
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Justification form
+            document.getElementById('justifyForm').addEventListener('submit', submitJustification);
+            
+            // Reason type change
+            document.getElementById('reason_type').addEventListener('change', function() {
+                const customGroup = document.getElementById('custom_reason_group');
+                customGroup.style.display = this.value === 'other' ? 'block' : 'none';
+            });
+
+            // Modal close on outside click
+            window.onclick = function(event) {
+                const modal = document.getElementById('justifyModal');
+                if (event.target === modal) {
+                    closeModal();
+                }
+            }
+        }
+
+        // Initialize attendance chart
+        function initChart() {
+            const ctx = document.getElementById('attendanceChart').getContext('2d');
+            
+            // Get chart data from backend
+            fetch('/api/student_chart_data')
+                .then(response => response.json())
+                .then(data => {
+                    attendanceChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels || ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'],
+                            datasets: [{
+                                label: 'Taux de Présence (%)',
+                                data: data.attendance_rates || [75, 80, 85, 82, 88, 85],
+                                borderColor: '#00a86b',
+                                backgroundColor: 'rgba(0, 168, 107, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top'
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 100,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return value + '%';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading chart data:', error);
+                    // Fallback chart with default data
+                    attendanceChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin'],
+                            datasets: [{
+                                label: 'Taux de Présence (%)',
+                                data: [75, 80, 85, 82, 88, 85],
+                                borderColor: '#00a86b',
+                                backgroundColor: 'rgba(0, 168, 107, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false
+                        }
+                    });
+                });
+        }
+
+        // Load attendance data (for dynamic updates)
+        function loadAttendanceData() {
+            // This could be used for real-time updates or pagination
+            console.log('Attendance data loaded');
+        }
+
+        // Filter functions
+        function applyFilters() {
+            const monthFilter = document.getElementById('month-filter').value;
+            const subjectFilter = document.getElementById('subject-filter').value;
+            const statusFilter = document.getElementById('status-filter').value;
+            
+            const rows = document.querySelectorAll('#attendanceTable tbody tr[data-month]');
+            
+            rows.forEach(row => {
+                let show = true;
+                
+                if (monthFilter !== 'all' && row.dataset.month !== monthFilter) {
+                    show = false;
+                }
+                
+                if (subjectFilter !== 'all' && row.dataset.course !== subjectFilter) {
+                    show = false;
+                }
+                
+                if (statusFilter !== 'all' && row.dataset.status !== statusFilter) {
+                    show = false;
+                }
+                
+                row.style.display = show ? '' : 'none';
+            });
+        }
+
+        function resetFilters() {
+            document.getElementById('month-filter').value = 'all';
+            document.getElementById('subject-filter').value = 'all';
+            document.getElementById('status-filter').value = 'all';
+            applyFilters();
+        }
+
+        // Modal functions
+        function justifyAbsence(attendanceId) {
+            currentAttendanceId = attendanceId;
+            document.getElementById('attendance_id').value = attendanceId;
+            document.getElementById('justifyModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('justifyModal').style.display = 'none';
+            document.getElementById('justifyForm').reset();
+            document.getElementById('custom_reason_group').style.display = 'none';
+            currentAttendanceId = null;
+        }
+
+        // Submit justification
+        function submitJustification(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const submitBtn = e.target.querySelector('.btn-submit');
+            
+            // Show loading state
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Envoi...';
+            submitBtn.disabled = true;
+            
+            fetch('/submit_justification', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('Justification soumise avec succès!', 'success');
+                    closeModal();
+                    // Refresh page or update table
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showMessage(data.message || 'Erreur lors de la soumission', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('Erreur de connexion', 'error');
+            })
+            .finally(() => {
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Soumettre';
+                submitBtn.disabled = false;
+            });
+        }
+
+        // Action functions
+        function viewDetails(id) {
+            // You can implement a detail view modal or redirect
+            window.location.href = `/attendance_detail/${id}`;
+        }
+
+        // Export functions
+        function exportToPDF() {
+            window.open(`/export/attendance/pdf?student_id={{ session.user_id }}`, '_blank');
+        }
+
+        function exportToExcel() {
+            window.open(`/export/attendance/excel?student_id={{ session.user_id }}`, '_blank');
+        }
+
+        // Pagination
+        function changePage(page) {
+            const url = new URL(window.location);
+            url.searchParams.set('page', page);
+            window.location.href = url.toString();
+        }
+
+        // Utility functions
+        function showMessage(message, type) {
+            const flashContainer = document.querySelector('.flash-messages') || createFlashContainer();
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flash-message flash-${type}`;
+            messageDiv.innerHTML = `
+                ${message}
+                <button onclick="this.parentElement.remove()" class="close-btn">&times;</button>
+            `;
+            flashContainer.appendChild(messageDiv);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (messageDiv.parentElement) {
+                    messageDiv.remove();
+                }
+            }, 5000);
+        }
+
+        function createFlashContainer() {
+            const container = document.createElement('div');
+            container.className = 'flash-messages';
+            document.body.insertBefore(container, document.body.firstChild);
+            return container;
+        }
+
+        // Auto-refresh attendance status (optional)
+        setInterval(() => {
+            // You could implement real-time updates here
+            // loadAttendanceData();
+        }, 300000); // 5 minutes
+    </script>
+</body>
+</html>
+</html>

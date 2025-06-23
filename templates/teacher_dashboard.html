@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Professeur - Gestion de Pointage</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/teacher_dashboard.css') }}">
+    <style>
+        /* [Keep all your existing CSS styles] */
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="welcome">
+            <h1>Tableau de Bord Professeur</h1>
+            <p>Bienvenue, {{ session.user_name }}</p>
+        </div>
+        <div class="user-info" style="cursor:pointer;" onclick="window.location.href='/profile'">
+            <i class="fas fa-user-tie"></i>
+            <span>{{ session.user_name }}</span>
+        </div>
+        <a href="/logout" class="logout-btn" onclick="return confirm('Êtes-vous sûr de vouloir vous déconnecter ?')">
+            <i class="fas fa-sign-out-alt"></i> Déconnexion
+        </a>
+    </div>
+
+    <div class="notification">
+        <i class="fas fa-info-circle"></i>
+        <div class="notification-content">
+            <h4>Information</h4>
+            <p>Sélectionnez un cours et générez le QR code pour permettre aux étudiants de marquer leur présence, ou utilisez la saisie manuelle.</p>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    <div id="alert-container"></div>
+
+    <div class="dashboard-grid">
+        <!-- QR Code Card -->
+        <div class="card">
+            <h2><i class="fas fa-qrcode"></i> QR Code Présence</h2>
+            
+            <div class="course-selector">
+                <select id="course-select" onchange="onCourseChange()">
+                    <option value="">Sélectionnez un cours</option>
+                    {% for course in teacher_courses %}
+                    <option value="{{ course.id }}">{{ course.nom_cours }} - {{ course.classe }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="qr-placeholder" id="qr-code-box">
+                <span id="qr-placeholder-text">Sélectionnez un cours</span>
+                <img id="qr-code-img" class="qr-code-img" style="display: none;" alt="QR Code">
+            </div>
+
+            <div style="text-align: center;">
+                <button class="btn" onclick="generateQR()" id="generate-btn" disabled>
+                    <i class="fas fa-sync"></i> Génerer QR Code
+                </button>
+                <button class="btn" onclick="shareQR()" id="share-btn" disabled>
+                    <i class="fas fa-share"></i> Partager
+                </button>
+                <button class="btn success" onclick="openManualAttendance()" id="manual-btn" disabled>
+                    <i class="fas fa-edit"></i> Saisie Manuelle
+                </button>
+            </div>
+
+            <p style="color: #666; margin-top: 15px; text-align: center;">
+                Le QR code expire après 2 heures.
+            </p>
+        </div>
+
+        <!-- Live Attendance Card -->
+        <div class="card">
+            <h2><i class="fas fa-users"></i> Présences en temps réel</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <span class="stat-number" id="present-count">0</span>
+                    <span class="stat-label">Présents</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number" id="absent-count">0</span>
+                    <span class="stat-label">Absents</span>
+                </div>
+            </div>
+
+            <div id="live-attendance">
+                <div class="loading" id="attendance-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Chargement des présences...</p>
+                </div>
+                <table id="attendance-table" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Nom de l'élève</th>
+                            <th>Heure</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendance-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance History Card -->
+    <div class="dashboard-grid" style="grid-template-columns: 2fr 1fr;">
+        <div class="card">
+            <h2><i class="fas fa-chart-bar"></i> Historique des présences</h2>
+            
+            <div id="attendance-history">
+                <div class="loading" id="history-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Chargement de l'historique...</p>
+                </div>
+                <table id="history-table" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Date</th>
+                            <th>Heure</th>
+                            <th>Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <div class="card">
+                <h2><i class="fas fa-bell"></i> Notifications</h2>
+                <div id="notifications">
+                    <div class="notif">Sélectionnez un cours pour voir les alertes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Attendance Modal -->
+    <div id="manual-attendance-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close" onclick="closeManualAttendance()">&times;</span>
+                <h3><i class="fas fa-edit"></i> Saisie Manuelle des Présences</h3>
+                <p>Marquez manuellement la présence des étudiants pour aujourd'hui</p>
+            </div>
+            
+            <div id="manual-attendance-list">
+                <div class="loading" id="students-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Chargement de la liste des étudiants...</p>
+                </div>
+                <div id="students-list" style="display: none;">
+                    <!-- Students will be populated here -->
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #ecf0f1;">
+                <button class="btn success" onclick="saveManualAttendance()">
+                    <i class="fas fa-save"></i> Sauvegarder les Présences
+                </button>
+                <button class="btn" onclick="closeManualAttendance()">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentCourseId = null;
+        let currentQRToken = null;
+        let attendanceUpdateInterval = null;
+        let currentStudents = [];
+
+        // Show alert function
+        function showAlert(message, type = 'success') {
+            const alertContainer = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert ${type} show`;
+            alert.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                ${message}
+            `;
+            alertContainer.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // Course selection change
+        function onCourseChange() {
+            const select = document.getElementById('course-select');
+            currentCourseId = select.value;
+            
+            const generateBtn = document.getElementById('generate-btn');
+            const shareBtn = document.getElementById('share-btn');
+            const manualBtn = document.getElementById('manual-btn');
+            
+            if (currentCourseId) {
+                generateBtn.disabled = false;
+                manualBtn.disabled = false;
+                resetQRCode();
+                loadCourseAttendance();
+            } else {
+                generateBtn.disabled = true;
+                shareBtn.disabled = true;
+                manualBtn.disabled = true;
+                resetQRCode();
+                clearAttendanceData();
+            }
+        }
+
+        // Reset QR code display
+        function resetQRCode() {
+            const qrBox = document.getElementById('qr-code-box');
+            const qrImg = document.getElementById('qr-code-img');
+            const qrText = document.getElementById('qr-placeholder-text');
+            const shareBtn = document.getElementById('share-btn');
+            
+            qrBox.classList.remove('active');
+            qrImg.style.display = 'none';
+            qrText.style.display = 'block';
+            qrText.textContent = currentCourseId ? 'Cliquez sur "Générer QR Code"' : 'Sélectionnez un cours';
+            shareBtn.disabled = true;
+            currentQRToken = null;
+        }
+
+        // Generate QR Code
+        async function generateQR() {
+            if (!currentCourseId) {
+                showAlert('Veuillez sélectionner un cours', 'error');
+                return;
+            }
+
+            const generateBtn = document.getElementById('generate-btn');
+            generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Génération...';
+            generateBtn.disabled = true;
+
+            try {
+                // Call the backend to generate QR code
+                const response = await fetch(`/generate_qr/${currentCourseId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Display QR code
+                    const qrBox = document.getElementById('qr-code-box');
+                    const qrImg = document.getElementById('qr-code-img');
+                    const qrText = document.getElementById('qr-placeholder-text');
+                    const shareBtn = document.getElementById('share-btn');
+
+                    qrImg.src = data.qr_code;
+                    qrImg.style.display = 'block';
+                    qrText.style.display = 'none';
+                    qrBox.classList.add('active');
+                    shareBtn.disabled = false;
+                    currentQRToken = data.token;
+
+                    showAlert('QR Code généré avec succès!');
+                    
+                    // Start real-time attendance updates
+                    startAttendanceUpdates();
+                } else {
+                    throw new Error(data.error || 'Erreur lors de la génération du QR code');
+                }
+            } catch (error) {
+                console.error('Error generating QR:', error);
+                showAlert(error.message, 'error');
+            } finally {
+                generateBtn.innerHTML = '<i class="fas fa-sync"></i> Générer QR Code';
+                generateBtn.disabled = false;
+            }
+        }
+
+        // Share QR Code
+        function shareQR() {
+            if (!currentQRToken) {
+                showAlert('Aucun QR code à partager', 'error');
+                return;
+            }
+
+            // Fallback: copy token to clipboard
+            navigator.clipboard.writeText(currentQRToken)
+                .then(() => {
+                    showAlert(`Token copié: ${currentQRToken}`);
+                })
+                .catch(() => {
+                    showAlert(`Token QR: ${currentQRToken}`, 'info');
+                });
+        }
+
+        // Open Manual Attendance Modal
+        function openManualAttendance() {
+            if (!currentCourseId) {
+                showAlert('Veuillez sélectionner un cours', 'error');
+                return;
+            }
+
+            const modal = document.getElementById('manual-attendance-modal');
+            const studentsLoading = document.getElementById('students-loading');
+            const studentsList = document.getElementById('students-list');
+            
+            modal.classList.add('show');
+            studentsLoading.classList.add('show');
+            studentsList.style.display = 'none';
+            
+            // Load students for the course
+            loadStudentsForManualAttendance();
+        }
+
+        // Close Manual Attendance Modal
+        function closeManualAttendance() {
+            const modal = document.getElementById('manual-attendance-modal');
+            modal.classList.remove('show');
+        }
+
+        // Load students for manual attendance
+        async function loadStudentsForManualAttendance() {
+            try {
+                const response = await fetch(`/api/course_students/${currentCourseId}`);
+                const students = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(students.error || 'Erreur lors du chargement des étudiants');
+                }
+
+                currentStudents = students;
+                
+                const studentsLoading = document.getElementById('students-loading');
+                const studentsList = document.getElementById('students-list');
+                
+                studentsLoading.classList.remove('show');
+                studentsList.style.display = 'block';
+                
+                // Get today's date
+                const today = new Date().toISOString().split('T')[0];
+                
+                // Check existing attendance for today
+                const attendanceResponse = await fetch(`/api/today_attendance/${currentCourseId}`);
+                const existingAttendance = await attendanceResponse.json();
+                
+                if (!attendanceResponse.ok) {
+                    throw new Error(existingAttendance.error || 'Erreur lors du chargement des présences');
+                }
+
+                studentsList.innerHTML = students.map(student => {
+                    const existing = existingAttendance.find(a => a.eleve_id === student.id);
+                    const currentStatus = existing ? existing.status : '';
+                    
+                    return `
+                        <div class="student-row">
+                            <div class="student-name">${student.prenom} ${student.nom}</div>
+                            <div class="attendance-controls">
+                                <button class="btn success ${currentStatus === 'present' ? 'btn-active' : ''}" 
+                                        onclick="setStudentAttendance(${student.id}, 'present')"
+                                        data-student="${student.id}" data-status="present">
+                                    <i class="fas fa-check"></i> Présent
+                                </button>
+                                <button class="btn danger ${currentStatus === 'absent' ? 'btn-active' : ''}" 
+                                        onclick="setStudentAttendance(${student.id}, 'absent')"
+                                        data-student="${student.id}" data-status="absent">
+                                    <i class="fas fa-times"></i> Absent
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                console.error('Error loading students:', error);
+                showAlert(error.message, 'error');
+            }
+        }
+
+        // Set student attendance status
+        function setStudentAttendance(studentId, status) {
+            // Update button states
+            const studentButtons = document.querySelectorAll(`[data-student="${studentId}"]`);
+            studentButtons.forEach(btn => {
+                btn.classList.remove('btn-active');
+                if (btn.dataset.status === status) {
+                    btn.classList.add('btn-active');
+                }
+            });
+            
+            // Store the selection
+            const student = currentStudents.find(s => s.id === studentId);
+            if (student) {
+                student.manualStatus = status;
+            }
+        }
+
+        // Save manual attendance
+        async function saveManualAttendance() {
+            const studentsWithStatus = currentStudents.filter(s => s.manualStatus);
+            
+            if (studentsWithStatus.length === 0) {
+                showAlert('Aucune présence sélectionnée', 'error');
+                return;
+            }
+
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const currentTime = new Date().toLocaleTimeString('fr-FR', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+                
+                // Prepare attendance data
+                const attendanceData = studentsWithStatus.map(student => ({
+                    eleve_id: student.id,
+                    course_id: currentCourseId,
+                    status: student.manualStatus,
+                    heure_presence: student.manualStatus === 'present' ? currentTime : null
+                }));
+
+                // Send to backend
+                const response = await fetch('/api/manual_attendance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        date_presence: today,
+                        attendance: attendanceData
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Erreur lors de la sauvegarde des présences');
+                }
+                
+                showAlert(`Présences sauvegardées pour ${studentsWithStatus.length} étudiant(s)`);
+                closeManualAttendance();
+                
+                // Refresh attendance display
+                loadTodayAttendance();
+                loadCourseAttendance();
+                
+            } catch (error) {
+                console.error('Error saving attendance:', error);
+                showAlert(error.message, 'error');
+            }
+        }
+
+        // Load course attendance data
+        async function loadCourseAttendance() {
+            if (!currentCourseId) return;
+
+            const historyLoading = document.getElementById('history-loading');
+            const historyTable = document.getElementById('history-table');
+            
+            historyLoading.classList.add('show');
+            historyTable.style.display = 'none';
+
+            try {
+                const response = await fetch(`/api/course_attendance/${currentCourseId}`);
+                const attendance = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(attendance.error || 'Erreur lors du chargement des présences');
+                }
+
+                displayAttendanceHistory(attendance);
+                updateNotifications(attendance);
+            } catch (error) {
+                console.error('Error loading course attendance:', error);
+                showAlert(error.message, 'error');
+            } finally {
+                historyLoading.classList.remove('show');
+                historyTable.style.display = 'table';
+            }
+        }
+
+        // Display attendance history
+        function displayAttendanceHistory(attendance) {
+            const tbody = document.getElementById('history-tbody');
+            tbody.innerHTML = '';
+
+            if (attendance.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #7f8c8d;">Aucun enregistrement</td></tr>';
+                return;
+            }
+
+            // Sort by date and time (most recent first)
+            attendance.sort((a, b) => {
+                const dateCompare = b.date_presence.localeCompare(a.date_presence);
+                if (dateCompare !== 0) return dateCompare;
+                return (b.heure_presence || '').localeCompare(a.heure_presence || '');
+            });
+
+            attendance.forEach(record => {
+                const row = document.createElement('tr');
+                const statusClass = record.status === 'present' ? 'status-present' : 
+                                  record.status === 'justified' ? 'status-justified' : 'status-absent';
+                const statusText = record.status === 'present' ? 'Présent' : 
+                                 record.status === 'justified' ? 'Justifié' : 'Absent';
+
+                row.innerHTML = `
+                    <td>${record.eleve_prenom} ${record.eleve_nom}</td>
+                    <td>${record.date_presence}</td>
+                    <td>${record.heure_presence || '-'}</td>
+                    <td><span class="${statusClass}">${statusText}</span></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Start real-time attendance updates
+        function startAttendanceUpdates() {
+            if (attendanceUpdateInterval) {
+                clearInterval(attendanceUpdateInterval);
+            }
+
+            // Update every 5 seconds
+            attendanceUpdateInterval = setInterval(() => {
+                loadTodayAttendance();
+            }, 5000);
+
+            // Load immediately
+            loadTodayAttendance();
+        }
+
+        // Load today's attendance for the current course
+        async function loadTodayAttendance() {
+            if (!currentCourseId) return;
+
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const response = await fetch(`/api/today_attendance/${currentCourseId}`);
+                const todayAttendance = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(todayAttendance.error || 'Erreur lors du chargement des présences');
+                }
+
+                displayLiveAttendance(todayAttendance);
+            } catch (error) {
+                console.error('Error loading today attendance:', error);
+            }
+        }
+
+        // Display live attendance
+        function displayLiveAttendance(attendance) {
+            const tbody = document.getElementById('attendance-tbody');
+            const attendanceTable = document.getElementById('attendance-table');
+            const attendanceLoading = document.getElementById('attendance-loading');
+            const presentCount = document.getElementById('present-count');
+            const absentCount = document.getElementById('absent-count');
+
+            // Update stats
+            const present = attendance.filter(r => r.status === 'present').length;
+            const absent = attendance.filter(r => r.status === 'absent').length;
+            
+            presentCount.textContent = present;
+            absentCount.textContent = absent;
+
+            // Show table
+            attendanceLoading.classList.remove('show');
+            attendanceTable.style.display = 'table';
+
+            // Clear and populate table
+            tbody.innerHTML = '';
+
+            if (attendance.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #7f8c8d;">Aucune présence aujourd\'hui</td></tr>';
+                return;
+            }
+
+            // Sort by time (most recent first)
+            attendance.sort((a, b) => (b.heure_presence || '').localeCompare(a.heure_presence || ''));
+
+            attendance.forEach(record => {
+                const row = document.createElement('tr');
+                const statusClass = record.status === 'present' ? 'status-present' : 'status-absent';
+                const statusText = record.status === 'present' ? 'Présent' : 'Absent';
+
+                row.innerHTML = `
+                    <td>${record.eleve_prenom} ${record.eleve_nom}</td>
+                    <td>${record.heure_presence || '-'}</td>
+                    <td><span class="${statusClass}">${statusText}</span></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Update notifications based on attendance data
+        function updateNotifications(attendance) {
+            const notificationsDiv = document.getElementById('notifications');
+            
+            // Calculate absence rates
+            const studentStats = {};
+            attendance.forEach(record => {
+                const studentKey = `${record.eleve_prenom} ${record.eleve_nom}`;
+                if (!studentStats[studentKey]) {
+                    studentStats[studentKey] = { total: 0, present: 0 };
+                }
+                studentStats[studentKey].total++;
+                if (record.status === 'present') {
+                    studentStats[studentKey].present++;
+                }
+            });
+
+            let notifications = [];
+            
+            Object.entries(studentStats).forEach(([student, stats]) => {
+                const absenceRate = ((stats.total - stats.present) / stats.total) * 100;
+                if (absenceRate > 20 && stats.total >= 3) {
+                    notifications.push(`⚠️ Taux d'absence élevé pour ${student} (${absenceRate.toFixed(1)}%)`);
+                }
+            });
+
+            if (notifications.length === 0) {
+                notifications.push('✅ Aucune alerte pour ce cours');
+            }
+
+            notificationsDiv.innerHTML = notifications.map(notif => 
+                `<div class="notif">${notif}</div>`
+            ).join('');
+        }
+
+        // Clear attendance data
+        function clearAttendanceData() {
+            document.getElementById('present-count').textContent = '0';
+            document.getElementById('absent-count').textContent = '0';
+            document.getElementById('attendance-tbody').innerHTML = '';
+            document.getElementById('history-tbody').innerHTML = '';
+            document.getElementById('notifications').innerHTML = '<div class="notif">Sélectionnez un cours pour voir les alertes</div>';
+            
+            if (attendanceUpdateInterval) {
+                clearInterval(attendanceUpdateInterval);
+                attendanceUpdateInterval = null;
+            }
+        }
+
+        // Add CSS for active button state
+        function addActiveButtonStyles() {
+            const style = document.createElement('style');
+            style.textContent = `
+                .btn-active {
+                    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3) !important;
+                    transform: scale(1.05) !important;
+                }
+                .btn.success.btn-active {
+                    box-shadow: 0 0 0 3px rgba(39, 174, 96, 0.3) !important;
+                }
+                .btn.danger.btn-active {
+                    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.3) !important;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (attendanceUpdateInterval) {
+                clearInterval(attendanceUpdateInterval);
+            }
+        });
+
+        // Close modal when clicking outside
+        window.addEventListener('click', (event) => {
+            const modal = document.getElementById('manual-attendance-modal');
+            if (event.target === modal) {
+                closeManualAttendance();
+            }
+        });
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            addActiveButtonStyles();
+            
+            // Load initial data if there are courses
+            const courseSelect = document.getElementById('course-select');
+            if (courseSelect.options.length > 1) {
+                // Auto-select first course if only one available
+                if (courseSelect.options.length === 2) {
+                    courseSelect.selectedIndex = 1;
+                    onCourseChange();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
