@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import secrets
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 # Generate a proper secret key
@@ -15,6 +16,15 @@ app.secret_key = secrets.token_hex(32)
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# Configure file upload
+UPLOAD_FOLDER = 'uploads/justifications'
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max file size
+
+# Create upload directory if it doesn't exist
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Database initialization
 def init_db():
@@ -97,7 +107,7 @@ def init_db():
             attendance_id INTEGER NOT NULL,
             reason_type TEXT NOT NULL,
             custom_reason TEXT,
-            description TEXT ,
+            description TEXT,
             document_path TEXT,
             status TEXT DEFAULT 'en_attente',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -109,19 +119,20 @@ def init_db():
             UNIQUE(attendance_id)
         )
     ''')
+    
     # Schedule table
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS schedule (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        course_id INTEGER,
-        day_of_week INTEGER NOT NULL,  -- 0=Monday, 1=Tuesday, etc.
-        start_time TEXT NOT NULL,      
-        end_time TEXT NOT NULL,
-        room TEXT NOT NULL,
-        type TEXT NOT NULL CHECK(type IN ('COURS', 'TD', 'TP')),
-        classe TEXT NOT NULL,
-        FOREIGN KEY (course_id) REFERENCES courses(id)
-    )
+        CREATE TABLE IF NOT EXISTS schedule (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            course_id INTEGER,
+            day_of_week INTEGER NOT NULL,  -- 0=Monday, 1=Tuesday, etc.
+            start_time TEXT NOT NULL,      
+            end_time TEXT NOT NULL,
+            room TEXT NOT NULL,
+            type TEXT NOT NULL CHECK(type IN ('COURS', 'TD', 'TP')),
+            classe TEXT NOT NULL,
+            FOREIGN KEY (course_id) REFERENCES courses(id)
+        )
     ''')
     
     # Check if default data already exists before inserting
@@ -183,103 +194,241 @@ def init_db():
                 ('C25423', '1234567929', 'Moulay', 'Abderrahmane Baba Chrif El Mokhtar', 'eleve', 'MAIGE-L2', '+22226320097')
         ''')
         
-        # Insert courses - Fixed syntax errors
+        # Insert courses - Fixed syntax errors and standardized names
         cursor.execute('''
             INSERT INTO courses (nom_cours, professeur_id, classe) VALUES
-                ('marketing', (SELECT id FROM users WHERE matricule = 'PROF007'), 'DAII-L2'),
-                ('web dynamique', (SELECT id FROM users WHERE matricule = 'PROF005'), 'DAII-L2'),
-                ('reseau informatique', (SELECT id FROM users WHERE matricule = 'PROF008'), 'DAII-L2'),
-                ('anglais', (SELECT id FROM users WHERE matricule = 'PROF006'), 'DAII-L2'),
-                ('projet Web', (SELECT id FROM users WHERE matricule = 'PROF005'), 'DAII-L2'),
-                ('outils Web', (SELECT id FROM users WHERE matricule = 'PROF009'), 'DAII-L2'),
-                ('Multimedia et programmation mobile', (SELECT id FROM users WHERE matricule = 'PROF001'), 'DAII-L2'),
+                ('Marketing', (SELECT id FROM users WHERE matricule = 'PROF007'), 'DAII-L2'),
+                ('Web Dynamique', (SELECT id FROM users WHERE matricule = 'PROF005'), 'DAII-L2'),
+                ('Reseau Informatique', (SELECT id FROM users WHERE matricule = 'PROF008'), 'DAII-L2'),
+                ('Anglais', (SELECT id FROM users WHERE matricule = 'PROF006'), 'DAII-L2'),
+                ('Projet Web', (SELECT id FROM users WHERE matricule = 'PROF005'), 'DAII-L2'),
+                ('Outils Web', (SELECT id FROM users WHERE matricule = 'PROF009'), 'DAII-L2'),
+                ('Multimedia et Programmation Mobile', (SELECT id FROM users WHERE matricule = 'PROF001'), 'DAII-L2'),
                 ('Francais', (SELECT id FROM users WHERE matricule = 'PROF002'), 'DAII-L2'),
-                ('analyse des donnees et DataMining', (SELECT id FROM users WHERE matricule = 'PROF003'), 'DAII-L2'),
-                ('marketing', (SELECT id FROM users WHERE matricule = 'PROF007'), 'MAIGE-L2'),
-                ('web dynamique', (SELECT id FROM users WHERE matricule = 'PROF005'), 'MAIGE-L2'),
-                ('reseau informatique', (SELECT id FROM users WHERE matricule = 'PROF008'), 'MAIGE-L2'),
-                ('anglais', (SELECT id FROM users WHERE matricule = 'PROF006'), 'MAIGE-L2'),
-                ('projet Web', (SELECT id FROM users WHERE matricule = 'PROF005'), 'MAIGE-L2'),
-                ('outils Web', (SELECT id FROM users WHERE matricule = 'PROF009'), 'MAIGE-L2'),
+                ('Analyse des Donnees et DataMining', (SELECT id FROM users WHERE matricule = 'PROF003'), 'DAII-L2'),
+                ('Marketing', (SELECT id FROM users WHERE matricule = 'PROF007'), 'MAIGE-L2'),
+                ('Web Dynamique', (SELECT id FROM users WHERE matricule = 'PROF005'), 'MAIGE-L2'),
+                ('Reseau Informatique', (SELECT id FROM users WHERE matricule = 'PROF008'), 'MAIGE-L2'),
+                ('Anglais', (SELECT id FROM users WHERE matricule = 'PROF006'), 'MAIGE-L2'),
+                ('Projet Web', (SELECT id FROM users WHERE matricule = 'PROF005'), 'MAIGE-L2'),
+                ('Outils Web', (SELECT id FROM users WHERE matricule = 'PROF009'), 'MAIGE-L2'),
                 ('Francais', (SELECT id FROM users WHERE matricule = 'PROF002'), 'MAIGE-L2'),
-                ('analyse des donnees et DataMining', (SELECT id FROM users WHERE matricule = 'PROF003'), 'MAIGE-L2'),      
-                ('Comptabilite analytique', (SELECT id FROM users WHERE matricule = 'PROF004'), 'MAIGE-L2')
+                ('Analyse des Donnees et DataMining', (SELECT id FROM users WHERE matricule = 'PROF003'), 'MAIGE-L2'),      
+                ('Comptabilite Analytique', (SELECT id FROM users WHERE matricule = 'PROF004'), 'MAIGE-L2')
         ''')
         
         # Insert sample attendance records - Fixed syntax
         cursor.execute('''
             INSERT INTO attendance (eleve_id, professeur_id, course_id, date_presence, heure_presence, status) VALUES
-                ((SELECT id FROM users WHERE matricule = 'C24544'), (SELECT id FROM users WHERE matricule = 'PROF001'), 1, '2025-06-01', '09:00:00', 'present'),
-                ((SELECT id FROM users WHERE matricule = 'C23211'), (SELECT id FROM users WHERE matricule = 'PROF001'), 1, '2025-06-01', '09:05:00', 'absent'),
-                ((SELECT id FROM users WHERE matricule = 'C23282'), (SELECT id FROM users WHERE matricule = 'PROF005'), 2, '2025-06-02', '10:00:00', 'justified')
+                ((SELECT id FROM users WHERE matricule = 'C24544'), (SELECT id FROM users WHERE matricule = 'PROF001'), 
+                (SELECT id FROM courses WHERE nom_cours = 'Multimedia et Programmation Mobile' AND classe = 'DAII-L2'), 
+                '2025-06-01', '09:00:00', 'present'),
+                
+                ((SELECT id FROM users WHERE matricule = 'C23211'), (SELECT id FROM users WHERE matricule = 'PROF001'), 
+                (SELECT id FROM courses WHERE nom_cours = 'Multimedia et Programmation Mobile' AND classe = 'DAII-L2'), 
+                '2025-06-01', '09:05:00', 'absent'),
+                
+                ((SELECT id FROM users WHERE matricule = 'C23282'), (SELECT id FROM users WHERE matricule = 'PROF005'), 
+                (SELECT id FROM courses WHERE nom_cours = 'Web Dynamique' AND classe = 'DAII-L2'), 
+                '2025-06-02', '10:00:00', 'justified')
         ''')
         
         # Insert sample justifications - Fixed references
         cursor.execute('''
-            INSERT INTO justifications (eleve_id, attendance_id, reason_type, document_path, status,description, approved_at, approved_by) VALUES
-                ((SELECT id FROM users WHERE matricule = 'C23211'), 2, 'Maladie', 'documents/justif_khadji_maladie.pdf', 'validee','', datetime('now'), (SELECT id FROM users WHERE matricule = 'SUPER001')),
-                ((SELECT id FROM users WHERE matricule = 'C23282'), 3, 'Problème familial', 'documents/justif_mohamed_famille.pdf','', 'en_attente', NULL, NULL)
+            INSERT INTO justifications (eleve_id, attendance_id, reason_type, document_path, status, description, approved_at, approved_by) VALUES
+                ((SELECT id FROM users WHERE matricule = 'C23211'), 
+                (SELECT id FROM attendance WHERE eleve_id = (SELECT id FROM users WHERE matricule = 'C23211') AND date_presence = '2025-06-01'), 
+                'Maladie', 'documents/justif_khadji_maladie.pdf', 'validee', '', datetime('now'), 
+                (SELECT id FROM users WHERE matricule = 'SUPER001')),
+                
+                ((SELECT id FROM users WHERE matricule = 'C23282'), 
+                (SELECT id FROM attendance WHERE eleve_id = (SELECT id FROM users WHERE matricule = 'C23282') AND date_presence = '2025-06-02'), 
+                'Problème familial', 'documents/justif_mohamed_famille.pdf', 'en_attente', '', NULL, NULL)
         ''')
+        
         # Insert sample schedule data for DAII-L2
-    cursor.execute('''
-    INSERT INTO schedule (course_id, day_of_week, start_time, end_time, room, type, classe) VALUES
-        ((SELECT id FROM courses WHERE nom_cours = 'marketing' AND classe = 'DAII-L2'), 0, '08:30', '10:30', '206', 'COURS', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'reseau informatique' AND classe = 'DAII-L2'), 0, '10:30', '12:30', '105', 'COURS', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'recherche operationnelle' AND classe = 'DAII-L2'), 0, '14:00', '16:00', '206', 'COURS', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'recherche operationnelle' AND classe = 'DAII-L2'), 0, '16:00', '18:00', '206', 'TD', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'anglais' AND classe = 'DAII-L2'), 1, '10:30', '12:30', '105', 'COURS', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'analyse des donnees et DataMining' AND classe = 'DAII-L2'), 1, '14:00', '16:00', '002/204', 'TP', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'outils Web' AND classe = 'DAII-L2'), 1, '16:00', '18:00', '206', 'TP', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'projet Web' AND classe = 'DAII-L2'), 2, '08:30', '10:30', '105', 'COURS', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'outils Web' AND classe = 'DAII-L2'), 2, '10:30', '12:30', '105', 'COURS', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'reseau informatique' AND classe = 'DAII-L2'), 2, '14:00', '16:00', '206', 'TD', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'web dynamique' AND classe = 'DAII-L2'), 3, '08:30', '10:30', '105', 'COURS', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'web dynamique' AND classe = 'DAII-L2'), 3, '10:30', '12:30', '002', 'TP', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'program. mobile' AND classe = 'DAII-L2'), 4, '08:30', '10:30', '002', 'COURS', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'program. mobile' AND classe = 'DAII-L2'), 4, '10:30', '12:30', '002', 'TD', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'francais' AND classe = 'DAII-L2'), 5, '08:30', '10:30', '210', 'COURS', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'analyse des donnees' AND classe = 'DAII-L2'), 5, '10:30', '12:30', '202', 'COURS', 'DAII-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'comptabilite generale' AND classe = 'DAII-L2'), 5, '12:30', '14:00', '105', 'COURS', 'DAII-L2')
-    ''')
+        cursor.execute('''
+        INSERT INTO schedule (course_id, day_of_week, start_time, end_time, room, type, classe) VALUES
+            ((SELECT id FROM courses WHERE nom_cours = 'Marketing' AND classe = 'DAII-L2'), 0, '08:30', '10:30', '206', 'COURS', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Reseau Informatique' AND classe = 'DAII-L2'), 0, '10:30', '12:30', '105', 'COURS', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Analyse des Donnees et DataMining' AND classe = 'DAII-L2'), 0, '14:00', '16:00', '206', 'COURS', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Analyse des Donnees et DataMining' AND classe = 'DAII-L2'), 0, '16:00', '18:00', '206', 'TD', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Anglais' AND classe = 'DAII-L2'), 1, '10:30', '12:30', '105', 'COURS', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Analyse des Donnees et DataMining' AND classe = 'DAII-L2'), 1, '14:00', '16:00', '002/204', 'TP', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Outils Web' AND classe = 'DAII-L2'), 1, '16:00', '18:00', '206', 'TP', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Projet Web' AND classe = 'DAII-L2'), 2, '08:30', '10:30', '105', 'COURS', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Outils Web' AND classe = 'DAII-L2'), 2, '10:30', '12:30', '105', 'COURS', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Reseau Informatique' AND classe = 'DAII-L2'), 2, '14:00', '16:00', '206', 'TD', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Web Dynamique' AND classe = 'DAII-L2'), 3, '08:30', '10:30', '105', 'COURS', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Web Dynamique' AND classe = 'DAII-L2'), 3, '10:30', '12:30', '002', 'TP', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Multimedia et Programmation Mobile' AND classe = 'DAII-L2'), 4, '08:30', '10:30', '002', 'COURS', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Multimedia et Programmation Mobile' AND classe = 'DAII-L2'), 4, '10:30', '12:30', '002', 'TD', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Francais' AND classe = 'DAII-L2'), 5, '08:30', '10:30', '210', 'COURS', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Analyse des Donnees et DataMining' AND classe = 'DAII-L2'), 5, '10:30', '12:30', '202', 'COURS', 'DAII-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Comptabilite Analytique' AND classe = 'DAII-L2'), 5, '12:30', '14:00', '105', 'COURS', 'DAII-L2')
+        ''')
 
-# Insert sample schedule data for MAIGE-L2
-    cursor.execute('''
-    INSERT INTO schedule (course_id, day_of_week, start_time, end_time, room, type, classe) VALUES
-        ((SELECT id FROM courses WHERE nom_cours = 'marketing' AND classe = 'MAIGE-L2'), 0, '08:30', '10:30', '206', 'COURS', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'reseau informatique' AND classe = 'MAIGE-L2'), 0, '10:30', '12:30', '105', 'COURS', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'comptabilite analytique' AND classe = 'MAIGE-L2'), 0, '14:00', '16:00', '206', 'COURS', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'comptabilite analytique' AND classe = 'MAIGE-L2'), 0, '16:00', '18:00', '206', 'TD', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'anglais' AND classe = 'MAIGE-L2'), 1, '10:30', '12:30', '105', 'COURS', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'analyse des donnees et DataMining' AND classe = 'MAIGE-L2'), 1, '14:00', '16:00', '002/204', 'TP', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'outils Web' AND classe = 'MAIGE-L2'), 1, '16:00', '18:00', '206', 'TP', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'projet Web' AND classe = 'MAIGE-L2'), 2, '08:30', '10:30', '105', 'COURS', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'outils Web' AND classe = 'MAIGE-L2'), 2, '10:30', '12:30', '105', 'COURS', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'reseau informatique' AND classe = 'MAIGE-L2'), 2, '14:00', '16:00', '206', 'TD', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'web dynamique' AND classe = 'MAIGE-L2'), 3, '08:30', '10:30', '105', 'COURS', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'web dynamique' AND classe = 'MAIGE-L2'), 3, '10:30', '12:30', '002', 'TP', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'francais' AND classe = 'MAIGE-L2'), 4, '08:30', '10:30', '210', 'COURS', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'analyse des donnees' AND classe = 'MAIGE-L2'), 4, '10:30', '12:30', '202', 'COURS', 'MAIGE-L2'),
-        ((SELECT id FROM courses WHERE nom_cours = 'comptabilite generale' AND classe = 'MAIGE-L2'), 5, '12:30', '14:00', '105', 'COURS', 'MAIGE-L2')
-    ''')
+        # Insert sample schedule data for MAIGE-L2
+        cursor.execute('''
+        INSERT INTO schedule (course_id, day_of_week, start_time, end_time, room, type, classe) VALUES
+            ((SELECT id FROM courses WHERE nom_cours = 'Marketing' AND classe = 'MAIGE-L2'), 0, '08:30', '10:30', '206', 'COURS', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Reseau Informatique' AND classe = 'MAIGE-L2'), 0, '10:30', '12:30', '105', 'COURS', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Comptabilite Analytique' AND classe = 'MAIGE-L2'), 0, '14:00', '16:00', '206', 'COURS', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Comptabilite Analytique' AND classe = 'MAIGE-L2'), 0, '16:00', '18:00', '206', 'TD', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Anglais' AND classe = 'MAIGE-L2'), 1, '10:30', '12:30', '105', 'COURS', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Analyse des Donnees et DataMining' AND classe = 'MAIGE-L2'), 1, '14:00', '16:00', '002/204', 'TP', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Outils Web' AND classe = 'MAIGE-L2'), 1, '16:00', '18:00', '206', 'TP', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Projet Web' AND classe = 'MAIGE-L2'), 2, '08:30', '10:30', '105', 'COURS', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Outils Web' AND classe = 'MAIGE-L2'), 2, '10:30', '12:30', '105', 'COURS', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Reseau Informatique' AND classe = 'MAIGE-L2'), 2, '14:00', '16:00', '206', 'TD', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Web Dynamique' AND classe = 'MAIGE-L2'), 3, '08:30', '10:30', '105', 'COURS', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Web Dynamique' AND classe = 'MAIGE-L2'), 3, '10:30', '12:30', '002', 'TP', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Francais' AND classe = 'MAIGE-L2'), 4, '08:30', '10:30', '210', 'COURS', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Analyse des Donnees et DataMining' AND classe = 'MAIGE-L2'), 4, '10:30', '12:30', '202', 'COURS', 'MAIGE-L2'),
+            ((SELECT id FROM courses WHERE nom_cours = 'Comptabilite Analytique' AND classe = 'MAIGE-L2'), 5, '12:30', '14:00', '105', 'COURS', 'MAIGE-L2')
+        ''')
     
-    conn.commit()
-    conn.close()
+        conn.commit()
+     
+     
 
 def get_db_connection():
     conn = sqlite3.connect('attendance.db')
     conn.row_factory = sqlite3.Row
     return conn
 
+# ... [Keep all your existing route definitions, but make these changes:]
+
+# 1. Fix the duplicate route - remove one of the /api/course_attendance/<int:course_id> definitions
+# 2. In the student planning route, fix the course_name reference:
+@app.route('/student/planning')
+def student_planning():
+    if 'user_id' not in session or session.get('user_role') != 'eleve':
+        return redirect(url_for('index'))
+    
+    conn = get_db_connection()
+    try:
+        # Get student information
+        student = conn.execute(
+            'SELECT * FROM users WHERE id = ?', 
+            (session['user_id'],)
+        ).fetchone()
+        
+        if not student:
+            flash('Student not found', 'error')
+            return redirect(url_for('student_dashboard'))
+        
+        # Get schedule data
+        schedule = conn.execute('''
+            SELECT s.*, c.nom_cours as course_name, u.nom as prof_nom, u.prenom as prof_prenom
+            FROM schedule s
+            JOIN courses c ON s.course_id = c.id
+            JOIN users u ON c.professeur_id = u.id
+            WHERE s.classe = ?
+            ORDER BY s.day_of_week, s.start_time
+        ''', (student['classe'],)).fetchall()
+        
+        # Transform schedule data
+        schedule_data = {
+            'Monday': [],
+            'Tuesday': [],
+            'Wednesday': [],
+            'Thursday': [],
+            'Friday': [],
+            'Saturday': []
+        }
+        
+        for item in schedule:
+            day_map = {
+                0: 'Monday',
+                1: 'Tuesday', 
+                2: 'Wednesday',
+                3: 'Thursday',
+                4: 'Friday',
+                5: 'Saturday'
+            }
+            day_name = day_map.get(item['day_of_week'], 'Unknown')
+            schedule_data[day_name].append({
+                'course_name': item['course_name'],
+                'room': item['room'],
+                'type': item['type'],
+                'start_time': item['start_time'],
+                'end_time': item['end_time'],
+                'prof_name': f"{item['prof_prenom']} {item['prof_nom']}"
+            })
+        
+        return render_template('student_planning.html',
+                            student=dict(student),
+                            schedule=schedule_data)
+        
+    except Exception as e:
+        print(f"Error in student_planning: {e}")
+        flash('Error loading planning', 'error')
+        return redirect(url_for('student_dashboard'))
+    finally:
+        conn.close()
+
+# 3. Fix the manual attendance route to use safe parameterized queries:
+@app.route('/api/manual_attendance', methods=['POST'])
+def save_manual_attendance():
+    if 'user_id' not in session or session.get('user_role') != 'professeur':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    if not data or 'attendance' not in data or 'date_presence' not in data:
+        return jsonify({'error': 'Invalid data'}), 400
+    
+    conn = get_db_connection()
+    try:
+        # First delete any existing attendance for these students on this date
+        student_ids = [str(record['eleve_id']) for record in data['attendance']]
+        placeholders = ','.join(['?'] * len(student_ids))
+        
+        conn.execute(f'''
+            DELETE FROM attendance 
+            WHERE course_id = ? AND date_presence = ? 
+            AND eleve_id IN ({placeholders})
+        ''', [data['attendance'][0]['course_id'], data['date_presence']] + student_ids)
+        
+        # Then insert new attendance records
+        for record in data['attendance']:
+            conn.execute('''
+                INSERT INTO attendance 
+                (eleve_id, professeur_id, course_id, date_presence, heure_presence, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                record['eleve_id'],
+                session['user_id'],
+                record['course_id'],
+                data['date_presence'],
+                record['heure_presence'],
+                record['status']
+            ))
+        
+        conn.commit()
+        return jsonify({'success': True, 'count': len(data['attendance'])})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+# ... [Previous code remains the same until the routes section] ...
+
 @app.route('/')
 def index():
-    if 'user_id' in session:
-        user_role = session.get('user_role')
-        if user_role == 'eleve':
-            return redirect(url_for('student_dashboard'))
-        elif user_role == 'professeur':
-            return redirect(url_for('teacher_dashboard'))
-        elif user_role == 'superviseur':
-            return redirect(url_for('supervisor_dashboard'))
+    # Only redirect if we have COMPLETE valid session data
+    if all(key in session for key in ['user_id', 'user_role']):
+        try:
+            role = session['user_role']
+            if role == 'eleve':
+                return redirect(url_for('student_dashboard'))
+            elif role == 'professeur':
+                return redirect(url_for('teacher_dashboard'))
+            elif role == 'superviseur':
+                return redirect(url_for('supervisor_dashboard'))
+        except Exception as e:
+            print(f"Redirect error: {e}")
+            session.clear()
     
     return render_template('login.html')
 
@@ -342,7 +491,6 @@ def create_qr_token(professeur_id, course_id):
     finally:
         conn.close()
 
-# Routes
 @app.route('/login', methods=['POST'])
 def login():
     try:
@@ -373,24 +521,21 @@ def login():
             elif user['role'] == 'superviseur':
                 return redirect(url_for('supervisor_dashboard'))
             else:
-                # Handle unknown role
                 return render_template('login.html', error='Rôle utilisateur non reconnu')
         else:
-            # User authentication failed
             return render_template('login.html', error='Matricule ou NNI invalide')
             
     except Exception as e:
         app.logger.error(f"Login error: {e}")
         flash('Erreur système. Veuillez réessayer.', 'error')
         return render_template('login.html')    
-    
-    
-
 
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for('index'))
+    response = redirect(url_for('index'))
+    response.delete_cookie('session')
+    return response
 
 @app.route('/student')
 def student_dashboard():
@@ -401,16 +546,7 @@ def student_dashboard():
     try:
         student_id = session['user_id']
         
-        attendance_stats = conn.execute('''
-            SELECT 
-                COUNT(*) as total_courses,
-                SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count,
-                SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_count
-            FROM attendance 
-            WHERE eleve_id = ?
-        ''', (student_id,)).fetchone()
-        
-        # Get recent attendance
+        # FIX: Make sure date values are properly converted to datetime objects
         recent_attendance = conn.execute('''
             SELECT a.*, c.nom_cours, u.nom as prof_nom, u.prenom as prof_prenom
             FROM attendance a
@@ -421,11 +557,18 @@ def student_dashboard():
             LIMIT 10
         ''', (student_id,)).fetchall()
         
+        # Convert string dates to datetime objects if needed
+        for record in recent_attendance:
+            if isinstance(record['date_presence'], str):
+                record['date_presence'] = datetime.strptime(record['date_presence'], '%Y-%m-%d')
+            if isinstance(record['heure_presence'], str):
+                record['heure_presence'] = datetime.strptime(record['heure_presence'], '%H:%M:%S').time()
+        
         return render_template('student_dashboard.html', 
-                             stats=attendance_stats, 
                              recent_attendance=recent_attendance)
     except Exception as e:
         print(f"Error in student_dashboard: {e}")
+        session.clear()  # Clear session to break redirect loop
         return redirect(url_for('index'))
     finally:
         conn.close()
@@ -448,7 +591,6 @@ def scan_qr():
         
         conn = get_db_connection()
         
-        # Verify QR code
         qr_data = conn.execute('''
             SELECT q.*, c.nom_cours 
             FROM qr_codes q
@@ -459,7 +601,6 @@ def scan_qr():
         if not qr_data:
             return jsonify({'error': 'Code QR invalide ou expiré'}), 400
         
-        # Check if already marked present today
         today = datetime.now().date()
         existing = conn.execute('''
             SELECT id FROM attendance 
@@ -469,7 +610,6 @@ def scan_qr():
         if existing:
             return jsonify({'error': 'Présence déjà enregistrée pour ce cours aujourd\'hui'}), 400
         
-        # Mark attendance
         now = datetime.now()
         conn.execute('''
             INSERT INTO attendance (eleve_id, professeur_id, course_id, date_presence, heure_presence, status)
@@ -502,7 +642,6 @@ def mes_presences():
     try:
         student_id = session['user_id']
         
-        # Get all attendance records for the student
         attendance = conn.execute('''
             SELECT a.*, c.nom_cours, u.nom as prof_nom, u.prenom as prof_prenom
             FROM attendance a
@@ -523,7 +662,6 @@ def justifier_absence():
     
     conn = get_db_connection()
     try:
-        # Get student's recent absences that can be justified
         absences = conn.execute('''
             SELECT a.id, a.date_presence, c.nom_cours
             FROM attendance a
@@ -540,32 +678,167 @@ def justifier_absence():
     finally:
         conn.close()
 
-@app.route('/mon_planning')
-def mon_planning():
+@app.route('/submit_justification', methods=['POST'])
+def submit_justification():
+    if 'user_id' not in session or session.get('user_role') != 'eleve':
+        return jsonify({'success': False, 'message': 'Non autorisé'}), 401
+    
+    try:
+        attendance_id = request.form.get('attendance_id')
+        reason_type = request.form.get('reason_type')
+        custom_reason = request.form.get('custom_reason', '')
+        description = request.form.get('description')
+        
+        if not attendance_id or not reason_type or not description:
+            return jsonify({'success': False, 'message': 'Tous les champs obligatoires doivent être remplis'})
+        
+        document_path = None
+        if 'document' in request.files:
+            file = request.files['document']
+            if file and file.filename != '' and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                filename = timestamp + filename
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                document_path = filename
+        
+        conn = get_db_connection()
+        
+        attendance = conn.execute('''
+            SELECT * FROM attendance 
+            WHERE id = ? AND eleve_id = ? AND status = 'absent'
+        ''', (attendance_id, session['user_id'])).fetchone()
+        
+        if not attendance:
+            return jsonify({'success': False, 'message': 'Enregistrement d\'absence non trouvé'})
+        
+        existing = conn.execute('''
+            SELECT id FROM justifications WHERE attendance_id = ?
+        ''', (attendance_id,)).fetchone()
+        
+        if existing:
+            return jsonify({'success': False, 'message': 'Cette absence a déjà été justifiée'})
+        
+        conn.execute('''
+            INSERT INTO justifications (
+                eleve_id, attendance_id, reason_type, custom_reason, 
+                description, document_path, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 'en_attente', ?)
+        ''', (
+            session['user_id'], attendance_id, reason_type, custom_reason,
+            description, document_path, datetime.now()
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': 'Justificatif soumis avec succès'})
+        
+    except Exception as e:
+        print(f"Error in submit_justification: {e}")
+        return jsonify({'success': False, 'message': 'Erreur interne du serveur'})
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/student/profile')
+def student_profile():
     if 'user_id' not in session or session.get('user_role') != 'eleve':
         return redirect(url_for('index'))
     
     conn = get_db_connection()
     try:
-        student = conn.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+        student_id = session['user_id']
         
-        if not student:
-            flash('Student not found', 'error')
-            return redirect(url_for('student_dashboard'))
+        student_info = conn.execute('''
+            SELECT * FROM users WHERE id = ? AND role = 'eleve'
+        ''', (student_id,)).fetchone()
         
-        # Get schedule data for the student's class
-        schedule = conn.execute('''
-            SELECT s.*, c.nom_cours, u.nom as prof_nom, u.prenom as prof_prenom
-            FROM schedule s
-            JOIN courses c ON s.course_id = c.id
-            JOIN users u ON c.professeur_id = u.id
-            WHERE s.classe = ?
-            ORDER BY s.day_of_week, s.start_time
-        ''', (student['classe'],)).fetchall()
+        attendance_stats = conn.execute('''
+            SELECT 
+                COUNT(*) as total_courses,
+                SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count,
+                SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_count
+            FROM attendance 
+            WHERE eleve_id = ?
+        ''', (student_id,)).fetchone()
         
-        return render_template('student_schedule.html', schedule=schedule)
+        return render_template('student_profile.html', 
+                             student_info=student_info,
+                             attendance_stats=attendance_stats)
+    except Exception as e:
+        print(f"Error in student_profile: {e}")
+        flash('Erreur lors du chargement du profil', 'error')
+        return redirect(url_for('student_dashboard'))
     finally:
-        conn.close()            
+        conn.close()
+
+@app.route('/api/student_info')
+def get_student_info():
+    if 'user_id' not in session or session.get('user_role') != 'eleve':
+        return jsonify({'error': 'Non autorisé'}), 401
+    
+    conn = get_db_connection()
+    try:
+        student = conn.execute(
+            'SELECT * FROM users WHERE id = ? AND role = "eleve"',
+            (session['user_id'],)
+        ).fetchone()
+        
+        return jsonify(dict(student)) if student else jsonify({'error': 'Étudiant non trouvé'}), 404
+    finally:
+        conn.close()
+
+@app.route('/api/student_absent_courses')
+def get_student_absent_courses():
+    if 'user_id' not in session or session.get('user_role') != 'eleve':
+        return jsonify({'error': 'Non autorisé'}), 401
+    
+    conn = get_db_connection()
+    try:
+        absent_courses = conn.execute('''
+            SELECT a.id as attendance_id, a.date_presence, a.heure_presence, 
+                   c.nom_cours, c.id as course_id
+            FROM attendance a
+            JOIN courses c ON a.course_id = c.id
+            LEFT JOIN justifications j ON a.id = j.attendance_id
+            WHERE a.eleve_id = ? 
+            AND a.status = 'absent'
+            AND j.id IS NULL
+            AND datetime(a.date_presence || ' ' || a.heure_presence) >= datetime('now', '-48 hours')
+            ORDER BY a.date_presence DESC, a.heure_presence DESC
+        ''', (session['user_id'],)).fetchall()
+        
+        return jsonify([dict(row) for row in absent_courses])
+    finally:
+        conn.close()
+
+@app.route('/api/student_justifications')
+def get_student_justifications():
+    if 'user_id' not in session or session.get('user_role') != 'eleve':
+        return jsonify({'error': 'Non autorisé'}), 401
+    
+    conn = get_db_connection()
+    try:
+        justifications = conn.execute('''
+            SELECT j.*, a.date_presence, a.heure_presence, c.nom_cours,
+                   CASE 
+                       WHEN j.status = 'en_attente' THEN 'En attente'
+                       WHEN j.status = 'validee' THEN 'Validée'
+                       WHEN j.status = 'refusee' THEN 'Refusée'
+                       ELSE j.status
+                   END as status_display
+            FROM justifications j
+            JOIN attendance a ON j.attendance_id = a.id
+            JOIN courses c ON a.course_id = c.id
+            WHERE j.eleve_id = ?
+            ORDER BY j.created_at DESC
+        ''', (session['user_id'],)).fetchall()
+        
+        return jsonify([dict(row) for row in justifications])
+    finally:
+        conn.close()
 
 # Teacher routes
 @app.route('/teacher_dashboard')
@@ -575,7 +848,6 @@ def teacher_dashboard():
     
     conn = get_db_connection()
     try:
-        # Get teacher's courses
         courses = conn.execute('''
             SELECT * FROM courses 
             WHERE professeur_id = ?
@@ -587,7 +859,74 @@ def teacher_dashboard():
                             session=session)
     finally:
         conn.close()
+@app.route('/teacher/profile')
+def professor_profile():
+    if 'user_id' not in session or session.get('user_role') != 'professeur':
+        return redirect(url_for('index'))
+    
+    conn = get_db_connection()
+    try:
+        # Get professor information
+        professor = conn.execute(
+            'SELECT * FROM users WHERE id = ?', 
+            (session['user_id'],)
+        ).fetchone()
+        
+        if not professor:
+            flash('Professeur non trouvé', 'error')
+            return redirect(url_for('teacher_dashboard'))
+        
+        # Get courses taught by this professor
+        courses_taught = conn.execute('''
+            SELECT c.id, c.nom_cours, c.classe 
+            FROM courses c
+            WHERE c.professeur_id = ?
+            ORDER BY c.nom_cours
+        ''', (session['user_id'],)).fetchall()
+        
+        return render_template('professor_profile.html',
+                            professor=dict(professor),
+                            courses_taught=courses_taught)
+        
+    except Exception as e:
+        print(f"Error in professor_profile: {e}")
+        flash('Erreur lors du chargement du profil', 'error')
+        return redirect(url_for('teacher_dashboard'))
+    finally:
+        conn.close()
 
+@app.route('/update_professor_profile', methods=['POST'])
+def update_professor_profile():
+    if 'user_id' not in session or session.get('user_role') != 'professeur':
+        return redirect(url_for('index'))
+    
+    email = request.form.get('email')
+    telephone = request.form.get('telephone')
+    
+    # Basic validation
+    if not email:
+        flash('L\'email est obligatoire', 'error')
+        return redirect(url_for('professor_profile'))
+    
+    conn = get_db_connection()
+    try:
+        conn.execute('''
+            UPDATE users 
+            SET email = ?, telephone = ?
+            WHERE id = ?
+        ''', (email, telephone, session['user_id']))
+        
+        conn.commit()
+        flash('Profil mis à jour avec succès', 'success')
+    except sqlite3.IntegrityError:
+        flash('Cet email est déjà utilisé par un autre utilisateur', 'error')
+    except Exception as e:
+        conn.rollback()
+        flash(f'Erreur lors de la mise à jour: {str(e)}', 'error')
+    finally:
+        conn.close()
+    
+    return redirect(url_for('professor_profile'))
 @app.route('/generate_qr/<int:course_id>')
 def generate_qr_route(course_id):
     if 'user_id' not in session or session.get('user_role') != 'professeur':
@@ -602,118 +941,176 @@ def generate_qr_route(course_id):
     else:
         return jsonify({'error': 'Erreur lors de la génération du QR code'}), 500
 
-# Supervisor routes
-@app.route('/supervisor')
-def supervisor_dashboard():
-    if 'user_id' not in session or session.get('user_role') != 'superviseur':
-        return redirect(url_for('index'))
+@app.route('/teacher/courses')
+def get_teacher_courses():
+    if 'user_id' not in session or session.get('user_role') != 'professeur':
+        return jsonify({'error': 'Unauthorized'}), 401
     
     conn = get_db_connection()
     try:
-        stats = conn.execute('''
-            SELECT 
-                COUNT(DISTINCT eleve_id) as total_students,
-                COUNT(DISTINCT professeur_id) as total_teachers,
-                COUNT(*) as total_records,
-                SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as total_present,
-                SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as total_absent
-            FROM attendance
-        ''').fetchone()
-        
-        students = conn.execute('''
-            SELECT * FROM users WHERE role = 'eleve' ORDER BY nom, prenom
-        ''').fetchall()
-        
-        professors = conn.execute('''
-            SELECT * FROM users WHERE role = 'professeur' ORDER BY nom, prenom
-        ''').fetchall()
-        
         courses = conn.execute('''
-            SELECT c.*, u.nom as professeur_nom, u.prenom as professeur_prenom
-            FROM courses c
-            LEFT JOIN users u ON c.professeur_id = u.id
-            ORDER BY c.nom_cours
-        ''').fetchall()
-        
-        recent_attendance = conn.execute('''
-            SELECT a.*, 
-                   e.nom as eleve_nom, e.prenom as eleve_prenom, e.matricule as eleve_matricule,
-                   p.nom as prof_nom, p.prenom as prof_prenom,
-                   c.nom_cours
-            FROM attendance a
-            JOIN users e ON a.eleve_id = e.id
-            JOIN users p ON a.professeur_id = p.id
-            JOIN courses c ON a.course_id = c.id
-            ORDER BY a.date_presence DESC, a.heure_presence DESC
-            LIMIT 20
-        ''').fetchall()
-        
-        pending_justifications = conn.execute('''
-            SELECT 
-                j.*,
-                e.nom as eleve_nom, e.prenom as eleve_prenom, e.matricule as eleve_matricule,
-                c.nom_cours
-            FROM justifications j
-            JOIN users e ON j.eleve_id = e.id
-            JOIN attendance a ON j.attendance_id = a.id
-            JOIN courses c ON a.course_id = c.id
-            WHERE j.status = 'en_attente'
-            ORDER BY j.created_at DESC
-        ''').fetchall()
-        
-        return render_template('supervisor_dashboard.html', 
-                             stats=stats,
-                             students=students,
-                             professors=professors,
-                             courses=courses,
-                             recent_attendance=recent_attendance,
-                             pending_justifications=pending_justifications)
-    except Exception as e:
-        print(f"Error in supervisor_dashboard: {e}")
-        return redirect(url_for('index'))
+            SELECT * FROM courses 
+            WHERE professeur_id = ?
+            ORDER BY nom_cours
+        ''', (session['user_id'],)).fetchall()
+        return jsonify([dict(course) for course in courses])
     finally:
         conn.close()
 
-# Student Management Routes for Supervisor
-@app.route('/add_student', methods=['POST'])
-def add_student():
-    if 'user_id' not in session or session.get('user_role') != 'superviseur':
-        return redirect(url_for('index'))
+@app.route('/api/course_students/<int:course_id>')
+def get_course_students(course_id):
+    if 'user_id' not in session or session.get('user_role') != 'professeur':
+        return jsonify({'error': 'Unauthorized'}), 401
     
-    matricule = request.form.get('matricule')
-    nni = request.form.get('nni')
-    nom = request.form.get('nom')
-    prenom = request.form.get('prenom')
-    email = request.form.get('email', '')
-    telephone = request.form.get('telephone', '')
-    classe = request.form.get('classe')
-    
-    if not matricule or not nni or not nom or not prenom:
-        flash('Matricule, NNI, nom et prénom sont obligatoires', 'error')
-        return redirect(url_for('supervisor_dashboard'))
-    
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        course = conn.execute('SELECT classe FROM courses WHERE id = ?', (course_id,)).fetchone()
+        if not course:
+            return jsonify({'error': 'Course not found'}), 404
+            
+        students = conn.execute('''
+            SELECT id, matricule, nom, prenom 
+            FROM users 
+            WHERE role = 'eleve' AND classe = ?
+            ORDER BY nom, prenom
+        ''', (course['classe'],)).fetchall()
         
-        cursor.execute("""
-            INSERT INTO users (matricule, nni, nom, prenom, role, classe, email, telephone)
-            VALUES (?, ?, ?, ?, 'eleve', ?, ?, ?)
-        """, (matricule, nni, nom, prenom, classe, email, telephone))
-        
-        conn.commit()
+        return jsonify([dict(student) for student in students])
+    finally:
         conn.close()
-        
-        flash(f'Étudiant {prenom} {nom} ajouté avec succès', 'success')
-    except sqlite3.IntegrityError:
-        flash('Ce matricule existe déjà', 'error')
-    except Exception as e:
-        flash(f'Erreur lors de l\'ajout: {str(e)}', 'error')
+
+@app.route('/api/today_attendance/<int:course_id>')
+def get_today_attendance(course_id):
+    if 'user_id' not in session or session.get('user_role') != 'professeur':
+        return jsonify({'error': 'Unauthorized'}), 401
     
-    return redirect(url_for('supervisor_dashboard'))
+    today = datetime.now().date().isoformat()
+    
+    conn = get_db_connection()
+    try:
+        attendance = conn.execute('''
+            SELECT a.*, u.nom as eleve_nom, u.prenom as eleve_prenom
+            FROM attendance a
+            JOIN users u ON a.eleve_id = u.id
+            WHERE a.course_id = ? AND a.date_presence = ?
+            ORDER BY a.heure_presence DESC
+        ''', (course_id, today)).fetchall()
+        
+        return jsonify([dict(record) for record in attendance])
+    finally:
+        conn.close()
 
+@app.route('/api/course_attendance/<int:course_id>')
+def get_course_attendance(course_id):
+    if 'user_id' not in session or session.get('user_role') != 'professeur':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn = get_db_connection()
+    try:
+        attendance = conn.execute('''
+            SELECT a.*, u.nom as eleve_nom, u.prenom as eleve_prenom
+            FROM attendance a
+            JOIN users u ON a.eleve_id = u.id
+            WHERE a.course_id = ?
+            ORDER BY a.date_presence DESC, a.heure_presence DESC
+        ''', (course_id,)).fetchall()
+        
+        return jsonify([dict(record) for record in attendance])
+    finally:
+        conn.close()
 
+# Supervisor routes
+@app.route('/supervisor_dashboard')
+def supervisor_dashboard():
+    # Get statistics data
+    conn = get_db_connection()
+    students = conn.execute('''
+            SELECT id, matricule, nni, nom, prenom, classe, email, telephone 
+            FROM users WHERE role = 'eleve' ORDER BY nom, prenom
+        ''').fetchall()
+        
+        # Convert to list of dicts for easier template handling
+    students_list = [dict(student) for student in students]
+    stats = conn.execute('''
+        SELECT 
+            COUNT(DISTINCT eleve_id) as total_students,
+            COUNT(DISTINCT professeur_id) as total_teachers,
+            COUNT(*) as total_records,
+            SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as total_present,
+            SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as total_absent,
+            SUM(CASE WHEN status = 'justified' THEN 1 ELSE 0 END) as total_justified
+        FROM attendance
+    ''').fetchone()
 
+    # Get students with highest absence rates
+    absent_students = conn.execute('''
+        SELECT u.id, u.matricule, u.nom, u.prenom, u.classe,
+               COUNT(a.id) as total_absences,
+               ROUND(100.0 * SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) / COUNT(a.id), 1) as absence_rate
+        FROM attendance a
+        JOIN users u ON a.eleve_id = u.id
+        WHERE u.role = 'eleve'
+        GROUP BY u.id
+        ORDER BY absence_rate DESC
+        LIMIT 5
+    ''').fetchall()
+
+    # Get professors with their students' absence rates
+    professor_stats = conn.execute('''
+        SELECT p.id, p.nom, p.prenom, 
+               COUNT(DISTINCT a.eleve_id) as student_count,
+               ROUND(100.0 * SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) / COUNT(a.id), 1) as absence_rate
+        FROM attendance a
+        JOIN users p ON a.professeur_id = p.id
+        WHERE p.role = 'professeur'
+        GROUP BY p.id
+        ORDER BY absence_rate DESC
+        LIMIT 5
+    ''').fetchall()
+
+    # Get pending justifications
+    pending_justifications = conn.execute('''
+        SELECT j.id, j.reason_type, j.description, j.created_at,
+               u.nom as eleve_nom, u.prenom as eleve_prenom, u.matricule as eleve_matricule,
+               c.nom_cours, a.date_presence
+        FROM justifications j
+        JOIN attendance a ON j.attendance_id = a.id
+        JOIN users u ON j.eleve_id = u.id
+        JOIN courses c ON a.course_id = c.id
+        WHERE j.status = 'en_attente'
+        ORDER BY j.created_at DESC
+        LIMIT 10
+    ''').fetchall()
+
+    # Get all classes for the class filter
+    classes = [row['classe'] for row in conn.execute('''
+        SELECT DISTINCT classe FROM users WHERE role = 'eleve' AND classe IS NOT NULL
+    ''').fetchall()]
+
+    # Calculate class stats
+    class_stats = {}
+    for class_name in classes:
+        stats = conn.execute('''
+            SELECT 
+                ROUND(100.0 * SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) / COUNT(*), 1) as absence,
+                ROUND(100.0 * SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) / COUNT(*), 1) as presence
+            FROM attendance a
+            JOIN users u ON a.eleve_id = u.id
+            WHERE u.classe = ?
+        ''', (class_name,)).fetchone()
+        class_stats[class_name] = dict(stats)
+
+    conn.close()
+
+    return render_template('supervisor_dashboard.html',
+                         students=students_list,
+                         stats=dict(stats),
+                         absent_students=absent_students,
+                         professor_stats=professor_stats,
+                         pending_justifications=pending_justifications,
+                         classes=classes,
+                         class_stats=class_stats,
+                         absence_rates=class_stats)  
 @app.route('/add_professor', methods=['POST'])
 def add_professor():
     if 'user_id' not in session or session.get('user_role') != 'superviseur':
@@ -749,9 +1146,6 @@ def add_professor():
         flash(f'Erreur lors de l\'ajout: {str(e)}', 'error')
     
     return redirect(url_for('supervisor_dashboard'))
-
-
-
 
 @app.route('/add_course', methods=['POST'])
 def add_course():
@@ -802,14 +1196,12 @@ def approve_justification(justification_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Update justification status
         cursor.execute("""
             UPDATE justifications 
             SET status = 'validee', approved_at = ?, approved_by = ?
             WHERE id = ?
         """, (datetime.now(), session['user_id'], justification_id))
         
-        # Get the associated attendance record and update it
         cursor.execute("""
             SELECT attendance_id FROM justifications WHERE id = ?
         """, (justification_id,))
@@ -852,36 +1244,86 @@ def reject_justification(justification_id):
         return jsonify({'success': False, 'message': f'Erreur: {str(e)}'})
 
 # API Routes
-@app.route('/api/students')
+@app.route('/api/students', methods=['GET', 'POST'])
 def api_students():
-    if 'user_id' not in session:
-        return jsonify({'error': 'Non autorisé'}), 401
+    if 'user_id' not in session or session.get('user_role') != 'superviseur':
+        return jsonify({'error': 'Unauthorized'}), 401
     
-    conn = get_db_connection()
-    students = conn.execute("SELECT * FROM users WHERE role = 'eleve' ORDER BY nom, prenom").fetchall()
-    conn.close()
+    if request.method == 'GET':
+        # Get all students
+        conn = get_db_connection()
+        students = conn.execute('''
+            SELECT id, matricule, nni, nom, prenom, classe, email, telephone 
+            FROM users WHERE role = 'eleve' ORDER BY nom, prenom
+        ''').fetchall()
+        conn.close()
+        return jsonify([dict(student) for student in students])
     
-    return jsonify([dict(row) for row in students])
+    elif request.method == 'POST':
+        # Add new student
+        data = request.get_json()
+        required_fields = ['matricule', 'nni', 'nom', 'prenom', 'classe']
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO users (matricule, nni, nom, prenom, role, classe, email, telephone)
+                VALUES (?, ?, ?, ?, 'eleve', ?, ?, ?)
+            ''', (
+                data['matricule'], data['nni'], data['nom'], data['prenom'],
+                data['classe'], data.get('email', ''), data.get('telephone', '')
+            ))
+            student_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            return jsonify({'success': True, 'id': student_id}), 201
+        except sqlite3.IntegrityError as e:
+            return jsonify({'error': 'Matricule or NNI already exists'}), 400
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
-@app.route('/api/professors')
+
+@app.route('/api/professors', methods=['GET', 'POST'])
 def api_professors():
-    if 'user_id' not in session:
-        return jsonify({'error': 'Non autorisé'}), 401
+    if 'user_id' not in session or session.get('user_role') != 'superviseur':
+        return jsonify({'error': 'Unauthorized'}), 401
     
-    conn = get_db_connection()
-    professors = conn.execute("""
-        SELECT id, matricule, nom, prenom, email, telephone 
-        FROM users WHERE role = 'professeur' ORDER BY nom, prenom
-    """).fetchall()
-    conn.close()
+    if request.method == 'GET':
+        conn = get_db_connection()
+        professors = conn.execute('''
+            SELECT id, matricule, nni, nom, prenom, email, telephone 
+            FROM users WHERE role = 'professeur' ORDER BY nom, prenom
+        ''').fetchall()
+        conn.close()
+        return jsonify([dict(professor) for professor in professors])
     
-    return jsonify([dict(row) for row in professors])
-
-# Add these routes to your Flask application
-
-# =========================
-# DELETE FUNCTIONS
-# =========================
+    elif request.method == 'POST':
+        data = request.get_json()
+        required_fields = ['matricule', 'nni', 'nom', 'prenom']
+        if not all(field in data for field in required_fields):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO users (matricule, nni, nom, prenom, role, email, telephone)
+                VALUES (?, ?, ?, ?, 'professeur', ?, ?)
+            ''', (
+                data['matricule'], data['nni'], data['nom'], data['prenom'],
+                data.get('email', ''), data.get('telephone', '')
+            ))
+            professor_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            return jsonify({'success': True, 'id': professor_id}), 201
+        except sqlite3.IntegrityError as e:
+            return jsonify({'error': 'Matricule or NNI already exists'}), 400
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
 @app.route('/delete_student/<int:student_id>', methods=['POST'])
 def delete_student(student_id):
@@ -892,20 +1334,17 @@ def delete_student(student_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Check if student has attendance records
         attendance_count = cursor.execute(
             'SELECT COUNT(*) FROM attendance WHERE eleve_id = ?', 
             (student_id,)
         ).fetchone()[0]
         
         if attendance_count > 0:
-            # Don't delete, just mark as inactive or return error
             return jsonify({
                 'success': False, 
                 'message': 'Impossible de supprimer: l\'étudiant a des enregistrements de présence'
             })
         
-        # Delete student
         cursor.execute('DELETE FROM users WHERE id = ? AND role = "eleve"', (student_id,))
         
         if cursor.rowcount == 0:
@@ -928,7 +1367,6 @@ def delete_professor(professor_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Check if professor has courses or attendance records
         course_count = cursor.execute(
             'SELECT COUNT(*) FROM courses WHERE professeur_id = ?', 
             (professor_id,)
@@ -945,7 +1383,6 @@ def delete_professor(professor_id):
                 'message': 'Impossible de supprimer: le professeur a des cours ou des enregistrements'
             })
         
-        # Delete professor
         cursor.execute('DELETE FROM users WHERE id = ? AND role = "professeur"', (professor_id,))
         
         if cursor.rowcount == 0:
@@ -968,7 +1405,6 @@ def delete_course(course_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Check if course has attendance records
         attendance_count = cursor.execute(
             'SELECT COUNT(*) FROM attendance WHERE course_id = ?', 
             (course_id,)
@@ -980,10 +1416,7 @@ def delete_course(course_id):
                 'message': 'Impossible de supprimer: le cours a des enregistrements de présence'
             })
         
-        # Delete related QR codes first
         cursor.execute('DELETE FROM qr_codes WHERE course_id = ?', (course_id,))
-        
-        # Delete course
         cursor.execute('DELETE FROM courses WHERE id = ?', (course_id,))
         
         if cursor.rowcount == 0:
@@ -996,10 +1429,6 @@ def delete_course(course_id):
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'Erreur: {str(e)}'})
-
-# =========================
-# EDIT/MODIFY FUNCTIONS
-# =========================
 
 @app.route('/edit_student/<int:student_id>', methods=['POST'])
 def edit_student(student_id):
@@ -1128,10 +1557,6 @@ def edit_course(course_id):
     
     return redirect(url_for('supervisor_dashboard'))
 
-# =========================
-# GET INDIVIDUAL RECORDS FOR EDITING
-# =========================
-
 @app.route('/api/student/<int:student_id>')
 def get_student(student_id):
     if 'user_id' not in session or session.get('user_role') != 'superviseur':
@@ -1149,6 +1574,101 @@ def get_student(student_id):
     else:
         return jsonify({'error': 'Étudiant non trouvé'}), 404
 
+@app.route('/api/justifications/<int:justification_id>', methods=['PUT'])
+def update_justification(justification_id):
+    if 'user_id' not in session or session.get('user_role') != 'superviseur':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.get_json()
+    if 'status' not in data or data['status'] not in ['validee', 'refusee']:
+        return jsonify({'error': 'Invalid status'}), 400
+    
+    try:
+        conn = get_db_connection()
+        
+        # Update justification status
+        conn.execute('''
+            UPDATE justifications 
+            SET status = ?, approved_at = datetime('now'), approved_by = ?
+            WHERE id = ?
+        ''', (data['status'], session['user_id'], justification_id))
+        
+        # Update attendance record if approved
+        if data['status'] == 'validee':
+            conn.execute('''
+                UPDATE attendance 
+                SET status = 'justified' 
+                WHERE id = (SELECT attendance_id FROM justifications WHERE id = ?)
+            ''', (justification_id,))
+        
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    
+# Student CRUD API
+@app.route('/api/students/<int:student_id>', methods=['GET', 'PUT', 'DELETE'])
+def api_student(student_id):
+    if 'user_id' not in session or session.get('user_role') != 'superviseur':
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn = get_db_connection()
+    
+    if request.method == 'GET':
+        student = conn.execute('''
+            SELECT id, matricule, nni, nom, prenom, classe, email, telephone 
+            FROM users WHERE id = ? AND role = 'eleve'
+        ''', (student_id,)).fetchone()
+        conn.close()
+        return jsonify(dict(student)) if student else jsonify({'error': 'Student not found'}), 404
+    
+    elif request.method == 'PUT':
+        data = request.get_json()
+        try:
+            conn.execute('''
+                UPDATE users 
+                SET matricule = ?, nni = ?, nom = ?, prenom = ?, classe = ?, email = ?, telephone = ?
+                WHERE id = ? AND role = 'eleve'
+            ''', (
+                data['matricule'], data['nni'], data['nom'], data['prenom'],
+                data['classe'], data.get('email', ''), data.get('telephone', ''),
+                student_id
+            ))
+            conn.commit()
+            conn.close()
+            return jsonify({'success': True})
+        except sqlite3.IntegrityError:
+            return jsonify({'error': 'Matricule or NNI already exists'}), 400
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    elif request.method == 'DELETE':
+        try:
+            # Check if student has attendance records
+            attendance_count = conn.execute('''
+                SELECT COUNT(*) FROM attendance WHERE eleve_id = ?
+            ''', (student_id,)).fetchone()[0]
+            
+            if attendance_count > 0:
+                return jsonify({
+                    'error': 'Cannot delete student with attendance records',
+                    'attendance_count': attendance_count
+                }), 400
+            
+            conn.execute('DELETE FROM users WHERE id = ? AND role = "eleve"', (student_id,))
+            conn.commit()
+            conn.close()
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+# Generate CSRF token
+@app.before_request
+def csrf_protect():
+    if 'csrf_token' not in session:
+        session['csrf_token'] = secrets.token_hex(16)    
 @app.route('/api/professor/<int:professor_id>')
 def get_professor(professor_id):
     if 'user_id' not in session or session.get('user_role') != 'superviseur':
@@ -1183,10 +1703,6 @@ def get_course(course_id):
     else:
         return jsonify({'error': 'Cours non trouvé'}), 404
 
-# =========================
-# BULK DELETE FUNCTIONS (OPTIONAL)
-# =========================
-
 @app.route('/delete_attendance/<int:attendance_id>', methods=['POST'])
 def delete_attendance(attendance_id):
     if 'user_id' not in session or session.get('user_role') != 'superviseur':
@@ -1196,10 +1712,7 @@ def delete_attendance(attendance_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Delete related justifications first
         cursor.execute('DELETE FROM justifications WHERE attendance_id = ?', (attendance_id,))
-        
-        # Delete attendance record
         cursor.execute('DELETE FROM attendance WHERE id = ?', (attendance_id,))
         
         if cursor.rowcount == 0:
@@ -1212,10 +1725,6 @@ def delete_attendance(attendance_id):
         
     except Exception as e:
         return jsonify({'success': False, 'message': f'Erreur: {str(e)}'})
-
-# =========================
-# ADDITIONAL HELPER FUNCTIONS
-# =========================
 
 @app.route('/get_student_attendance/<int:student_id>')
 def get_student_attendance(student_id):
@@ -1235,435 +1744,6 @@ def get_student_attendance(student_id):
     
     return jsonify([dict(row) for row in attendance])
 
-@app.route('/get_course_attendance/<int:course_id>')
-def get_course_attendance(course_id):
-    if 'user_id' not in session:
-        return jsonify({'error': 'Non autorisé'}), 401
-    
-    conn = get_db_connection()
-    attendance = conn.execute('''
-        SELECT a.*, e.nom as eleve_nom, e.prenom as eleve_prenom, e.matricule as eleve_matricule
-        FROM attendance a
-        JOIN users e ON a.eleve_id = e.id
-        WHERE a.course_id = ?
-        ORDER BY a.date_presence DESC, a.heure_presence DESC
-    ''', (course_id,)).fetchall()
-    conn.close()
-    
-    return jsonify([dict(row) for row in attendance])
-
-# Add these imports at the top of your file
-import os
-from werkzeug.utils import secure_filename
-
-# Configure file upload
-UPLOAD_FOLDER = 'uploads/justifications'
-ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max file size
-
-# Create upload directory if it doesn't exist
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-
-
-# Get student info
-@app.route('/api/student_info')
-def get_student_info():
-    if 'user_id' not in session or session.get('user_role') != 'eleve':
-        return jsonify({'error': 'Non autorisé'}), 401
-    
-    conn = get_db_connection()
-    try:
-        student = conn.execute(
-            'SELECT * FROM users WHERE id = ? AND role = "eleve"',
-            (session['user_id'],)
-        ).fetchone()
-        
-        return jsonify(dict(student)) if student else jsonify({'error': 'Étudiant non trouvé'}), 404
-    finally:
-        conn.close()
-
-# Get student's absent courses that can be justified
-@app.route('/api/student_absent_courses')
-def get_student_absent_courses():
-    if 'user_id' not in session or session.get('user_role') != 'eleve':
-        return jsonify({'error': 'Non autorisé'}), 401
-    
-    conn = get_db_connection()
-    try:
-        # Get absent courses from last 48 hours that haven't been justified yet
-        absent_courses = conn.execute('''
-            SELECT a.id as attendance_id, a.date_presence, a.heure_presence, 
-                   c.nom_cours, c.id as course_id
-            FROM attendance a
-            JOIN courses c ON a.course_id = c.id
-            LEFT JOIN justifications j ON a.id = j.attendance_id
-            WHERE a.eleve_id = ? 
-            AND a.status = 'absent'
-            AND j.id IS NULL
-            AND datetime(a.date_presence || ' ' || a.heure_presence) >= datetime('now', '-48 hours')
-            ORDER BY a.date_presence DESC, a.heure_presence DESC
-        ''', (session['user_id'],)).fetchall()
-        
-        return jsonify([dict(row) for row in absent_courses])
-    finally:
-        conn.close()
-# Add these routes to your Flask application
-
-@app.route('/student/planning')
-def student_planning():
-    if 'user_id' not in session or session.get('user_role') != 'eleve':
-        return redirect(url_for('index'))
-    
-    conn = get_db_connection()
-    try:
-        # Get student information
-        student = conn.execute(
-            'SELECT * FROM users WHERE id = ?', 
-            (session['user_id'],)
-        ).fetchone()
-        
-        if not student:
-            flash('Student not found', 'error')
-            return redirect(url_for('student_dashboard'))
-        
-        # Get the student's courses and schedule
-        courses = conn.execute('''
-            SELECT c.*, u.nom as prof_nom, u.prenom as prof_prenom
-            FROM courses c
-            JOIN users u ON c.professeur_id = u.id
-            WHERE c.classe = ?
-            ORDER BY c.nom_cours
-        ''', (student['classe'],)).fetchall()
-        
-        # Get attendance statistics
-        attendance_stats = conn.execute('''
-            SELECT 
-                COUNT(*) as total_courses,
-                SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count,
-                SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_count
-            FROM attendance 
-            WHERE eleve_id = ?
-        ''', (session['user_id'],)).fetchone()
-        
-        # Get schedule data (you'll need to add this to your database)
-        schedule = conn.execute('''
-            SELECT * FROM schedule 
-            WHERE classe = ?
-            ORDER BY day_of_week, start_time
-        ''', (student['classe'],)).fetchall()
-        
-        # Transform schedule data into a format suitable for your template
-        schedule_data = {
-            'Monday': [],
-            'Tuesday': [],
-            'Wednesday': [],
-            'Thursday': [],
-            'Friday': [],
-            'Saturday': []
-        }
-        
-        for item in schedule:
-            day_map = {
-                0: 'Monday',
-                1: 'Tuesday', 
-                2: 'Wednesday',
-                3: 'Thursday',
-                4: 'Friday',
-                5: 'Saturday'
-            }
-            day_name = day_map.get(item['day_of_week'], 'Unknown')
-            schedule_data[day_name].append({
-                'course_name': item['course_name'],
-                'room': item['room'],
-                'type': item['type'],
-                'start_time': item['start_time'],
-                'end_time': item['end_time']
-            })
-        
-        return render_template('student_planning.html',
-                            student=dict(student),
-                            attendance_stats=dict(attendance_stats),
-                            schedule=schedule_data,
-                            courses=[dict(c) for c in courses])
-        
-    except Exception as e:
-        print(f"Error in student_planning: {e}")
-        flash('Error loading planning', 'error')
-        return redirect(url_for('student_dashboard'))
-    finally:
-        conn.close()
-
-@app.route('/student/profile')
-def student_profile():
-    if 'user_id' not in session or session.get('user_role') != 'eleve':
-        return redirect(url_for('index'))
-    
-    conn = get_db_connection()
-    try:
-        student_id = session['user_id']
-        
-        # Get student information
-        student_info = conn.execute('''
-            SELECT * FROM users WHERE id = ? AND role = 'eleve'
-        ''', (student_id,)).fetchone()
-        
-        # Get attendance statistics
-        attendance_stats = conn.execute('''
-            SELECT 
-                COUNT(*) as total_courses,
-                SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count,
-                SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent_count
-            FROM attendance 
-            WHERE eleve_id = ?
-        ''', (student_id,)).fetchone()
-        
-        return render_template('student_profile.html', 
-                             student_info=student_info,
-                             attendance_stats=attendance_stats)
-    except Exception as e:
-        print(f"Error in student_profile: {e}")
-        flash('Erreur lors du chargement du profil', 'error')
-        return redirect(url_for('student_dashboard'))
-    finally:
-        conn.close()
-
-
-
-
-
-# API route to get student's justification history
-@app.route('/api/student_justifications')
-def get_student_justifications():
-    if 'user_id' not in session or session.get('user_role') != 'eleve':
-        return jsonify({'error': 'Non autorisé'}), 401
-    
-    conn = get_db_connection()
-    try:
-        justifications = conn.execute('''
-            SELECT j.*, a.date_presence, a.heure_presence, c.nom_cours,
-                   CASE 
-                       WHEN j.status = 'en_attente' THEN 'En attente'
-                       WHEN j.status = 'validee' THEN 'Validée'
-                       WHEN j.status = 'refusee' THEN 'Refusée'
-                       ELSE j.status
-                   END as status_display
-            FROM justifications j
-            JOIN attendance a ON j.attendance_id = a.id
-            JOIN courses c ON a.course_id = c.id
-            WHERE j.eleve_id = ?
-            ORDER BY j.created_at DESC
-        ''', (session['user_id'],)).fetchall()
-        
-        return jsonify([dict(row) for row in justifications])
-    finally:
-        conn.close()
-# Get teacher's courses
-@app.route('/teacher/courses')
-def get_teacher_courses():
-    if 'user_id' not in session or session.get('user_role') != 'professeur':
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    conn = get_db_connection()
-    try:
-        courses = conn.execute('''
-            SELECT * FROM courses 
-            WHERE professeur_id = ?
-            ORDER BY nom_cours
-        ''', (session['user_id'],)).fetchall()
-        return jsonify([dict(course) for course in courses])
-    finally:
-        conn.close()
-
-# Get students for a course
-@app.route('/api/course_students/<int:course_id>')
-def get_course_students(course_id):
-    if 'user_id' not in session or session.get('user_role') != 'professeur':
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    conn = get_db_connection()
-    try:
-        # First get the class for this course
-        course = conn.execute('SELECT classe FROM courses WHERE id = ?', (course_id,)).fetchone()
-        if not course:
-            return jsonify({'error': 'Course not found'}), 404
-            
-        # Then get all students in that class
-        students = conn.execute('''
-            SELECT id, matricule, nom, prenom 
-            FROM users 
-            WHERE role = 'eleve' AND classe = ?
-            ORDER BY nom, prenom
-        ''', (course['classe'],)).fetchall()
-        
-        return jsonify([dict(student) for student in students])
-    finally:
-        conn.close()
-
-# Get today's attendance for a course
-@app.route('/api/today_attendance/<int:course_id>')
-def get_today_attendance(course_id):
-    if 'user_id' not in session or session.get('user_role') != 'professeur':
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    today = datetime.now().date().isoformat()
-    
-    conn = get_db_connection()
-    try:
-        attendance = conn.execute('''
-            SELECT a.*, u.nom as eleve_nom, u.prenom as eleve_prenom
-            FROM attendance a
-            JOIN users u ON a.eleve_id = u.id
-            WHERE a.course_id = ? AND a.date_presence = ?
-            ORDER BY a.heure_presence DESC
-        ''', (course_id, today)).fetchall()
-        
-        return jsonify([dict(record) for record in attendance])
-    finally:
-        conn.close()
-
-# Get all attendance for a course
-@app.route('/api/course_attendance/<int:course_id>')
-def get_course_attendance(course_id):
-    if 'user_id' not in session or session.get('user_role') != 'professeur':
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    conn = get_db_connection()
-    try:
-        attendance = conn.execute('''
-            SELECT a.*, u.nom as eleve_nom, u.prenom as eleve_prenom
-            FROM attendance a
-            JOIN users u ON a.eleve_id = u.id
-            WHERE a.course_id = ?
-            ORDER BY a.date_presence DESC, a.heure_presence DESC
-        ''', (course_id,)).fetchall()
-        
-        return jsonify([dict(record) for record in attendance])
-    finally:
-        conn.close()
-
-# Save manual attendance
-@app.route('/api/manual_attendance', methods=['POST'])
-def save_manual_attendance():
-    if 'user_id' not in session or session.get('user_role') != 'professeur':
-        return jsonify({'error': 'Unauthorized'}), 401
-    
-    data = request.get_json()
-    if not data or 'attendance' not in data or 'date_presence' not in data:
-        return jsonify({'error': 'Invalid data'}), 400
-    
-    conn = get_db_connection()
-    try:
-        # First delete any existing attendance for these students on this date
-        student_ids = [str(record['eleve_id']) for record in data['attendance']]
-        conn.execute(f'''
-            DELETE FROM attendance 
-            WHERE course_id = ? AND date_presence = ? 
-            AND eleve_id IN ({','.join(['?']*len(student_ids))})
-        ''', [data['attendance'][0]['course_id'], data['date_presence']] + student_ids)
-        
-        # Then insert new attendance records
-        for record in data['attendance']:
-            conn.execute('''
-                INSERT INTO attendance 
-                (eleve_id, professeur_id, course_id, date_presence, heure_presence, status)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (
-                record['eleve_id'],
-                session['user_id'],
-                record['course_id'],
-                data['date_presence'],
-                record['heure_presence'],
-                record['status']
-            ))
-        
-        conn.commit()
-        return jsonify({'success': True, 'count': len(data['attendance'])})
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        conn.close()
-
-
-# Route to submit justification (already exists in your code, but here's an enhanced version)
-@app.route('/submit_justification', methods=['POST'])
-def submit_justification():
-    if 'user_id' not in session or session.get('user_role') != 'eleve':
-        return jsonify({'success': False, 'message': 'Non autorisé'}), 401
-    
-    try:
-        attendance_id = request.form.get('attendance_id')
-        reason_type = request.form.get('reason_type')
-        custom_reason = request.form.get('custom_reason', '')
-        description = request.form.get('description')
-        
-        if not attendance_id or not reason_type or not description:
-            return jsonify({'success': False, 'message': 'Tous les champs obligatoires doivent être remplis'})
-        
-        # Handle file upload if present
-        document_path = None
-        if 'document' in request.files:
-            file = request.files['document']
-            if file and file.filename != '' and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                # Add timestamp to filename to avoid conflicts
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                filename = timestamp + filename
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
-                document_path = filename
-        
-        conn = get_db_connection()
-        
-        # Verify the attendance record belongs to the student and is absent
-        attendance = conn.execute('''
-            SELECT * FROM attendance 
-            WHERE id = ? AND eleve_id = ? AND status = 'absent'
-        ''', (attendance_id, session['user_id'])).fetchone()
-        
-        if not attendance:
-            return jsonify({'success': False, 'message': 'Enregistrement d\'absence non trouvé'})
-        
-        # Check if already justified
-        existing = conn.execute('''
-            SELECT id FROM justifications WHERE attendance_id = ?
-        ''', (attendance_id,)).fetchone()
-        
-        if existing:
-            return jsonify({'success': False, 'message': 'Cette absence a déjà été justifiée'})
-        
-        # Insert justification
-        conn.execute('''
-            INSERT INTO justifications (
-                eleve_id, attendance_id, reason_type, custom_reason, 
-                description, document_path, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, 'en_attente', ?)
-        ''', (
-            session['user_id'], attendance_id, reason_type, custom_reason,
-            description, document_path, datetime.now()
-        ))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({'success': True, 'message': 'Justificatif soumis avec succès'})
-        
-    except Exception as e:
-        print(f"Error in submit_justification: {e}")
-        return jsonify({'success': False, 'message': 'Erreur interne du serveur'})
-
-# Helper function for file upload (add this if not already present)
-def allowed_file(filename):
-    ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg'}
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-
-
-
-# Debug route
 @app.route('/debug/session')
 def debug_session_route():
     if app.debug:

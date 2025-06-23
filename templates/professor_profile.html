@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/Mon_Profil.css') }}">
+    <title>Mon Profil Professeur - Gestion de Pointage</title>
+</head>
+<body>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <div class="header">
+        <div class="welcome">
+            <h1>Mon Profil Professeur</h1>
+            <p>Gestion des informations personnelles</p>
+        </div>
+        <a href="{{ url_for('teacher_dashboard') }}" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Retour au Dashboard
+        </a>
+    </div>
+
+    <div class="profile-container">
+        <!-- Profile Header -->
+        <div class="profile-header">
+            <div class="profile-avatar">
+                <i class="fas fa-user-tie"></i>
+                <div class="avatar-overlay">
+                    <i class="fas fa-camera"></i>
+                </div>
+            </div>
+            <div class="profile-info">
+                <h2>{{ professor.prenom }} {{ professor.nom }}</h2>
+                <p class="prof-id">ID: {{ professor.matricule }}</p>
+                <div class="profile-badges">
+                    <span class="badge badge-active">Actif</span>
+                    <span class="badge badge-prof">Professeur</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Tabs -->
+        <div class="profile-tabs">
+            <button class="tab-btn active" onclick="showTab('personal')">
+                <i class="fas fa-user"></i> Informations Personnelles
+            </button>
+            <button class="tab-btn" onclick="showTab('professional')">
+                <i class="fas fa-briefcase"></i> Informations Professionnelles
+            </button>
+        </div>
+
+        <!-- Personal Info Tab -->
+        <div id="personal-tab" class="tab-content active">
+            <div class="form-section">
+                <h3><i class="fas fa-user-edit"></i> Informations Personnelles</h3>
+                <form class="profile-form" action="{{ url_for('update_professor_profile') }}" method="POST">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="prenom">Prénom</label>
+                            <input type="text" id="prenom" name="prenom" value="{{ professor.prenom }}" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="nom">Nom</label>
+                            <input type="text" id="nom" name="nom" value="{{ professor.nom }}" readonly>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" name="email" value="{{ professor.email or '' }}" required>
+                            <i class="fas fa-edit edit-icon" onclick="enableEdit('email')"></i>
+                        </div>
+                        <div class="form-group">
+                            <label for="telephone">Téléphone</label>
+                            <input type="tel" id="telephone" name="telephone" value="{{ professor.telephone or '' }}">
+                            <i class="fas fa-edit edit-icon" onclick="enableEdit('telephone')"></i>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Professional Info Tab -->
+        <div id="professional-tab" class="tab-content">
+            <div class="form-section">
+                <h3><i class="fas fa-briefcase"></i> Informations Professionnelles</h3>
+                <div class="academic-cards">
+                    <div class="academic-card">
+                        <div class="card-header">
+                            <i class="fas fa-chalkboard-teacher"></i>
+                            <h4>Enseignements</h4>
+                        </div>
+                        <div class="card-content">
+                            <div class="stat-item">
+                                <span class="stat-label">Cours enseignés:</span>
+                                <div class="courses-list">
+                                    {% if courses_taught %}
+                                        {% for course in courses_taught %}
+                                        <div class="course-item">
+                                            <span class="course-name">{{ course.nom_cours }}</span>
+                                            <span class="course-class">{{ course.classe }}</span>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p>Aucun cours attribué</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+        <button class="btn-secondary" onclick="cancelChanges()">
+            <i class="fas fa-times"></i> Annuler
+        </button>
+        <button class="btn-primary" onclick="document.querySelector('.profile-form').submit()">
+            <i class="fas fa-save"></i> Sauvegarder les Modifications
+        </button>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            const buttons = document.querySelectorAll('.tab-btn');
+            
+            tabs.forEach(tab => tab.classList.remove('active'));
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        function enableEdit(fieldId) {
+            const field = document.getElementById(fieldId);
+            field.removeAttribute('readonly');
+            field.focus();
+            field.style.borderColor = '#00a86b';
+        }
+
+        function cancelChanges() {
+            if (confirm('Êtes-vous sûr de vouloir annuler les modifications ?')) {
+                location.reload();
+            }
+        }
+
+        // Add animation on load
+        window.addEventListener('load', () => {
+            const cards = document.querySelectorAll('.academic-card');
+            cards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateY(20px)';
+                    card.style.transition = 'all 0.5s ease';
+                    
+                    setTimeout(() => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'translateY(0)';
+                    }, 100);
+                }, index * 150);
+            });
+        });
+    </script>
+</body>
+</html>
