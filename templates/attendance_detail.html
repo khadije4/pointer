@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/student_attendance.css') }}">
+    <title>Détails de Présence - Gestion de Pointage</title>
+</head>
+<body>
+    <div class="header">
+        <div class="welcome">
+            <h1>Détails de Présence</h1>
+            <p>Historique de présence - {{ session.user_name }}</p>
+        </div>
+        <a href="{{ url_for('mes_presences') }}" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Retour à la liste
+        </a>
+    </div>
+
+    <div class="detail-container">
+        <div class="detail-card">
+            <div class="detail-row">
+                <span class="detail-label">Date:</span>
+                <span class="detail-value">{{ record.date_presence.strftime('%d/%m/%Y') }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Heure:</span>
+                <span class="detail-value">{{ record.heure_presence.strftime('%H:%M') }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Matière:</span>
+                <span class="detail-value">{{ record.nom_cours }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Professeur:</span>
+                <span class="detail-value">Prof. {{ record.prof_prenom }} {{ record.prof_nom }}</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Statut:</span>
+                <span class="status-badge status-{{ record.status }}">
+                    {% if record.status == 'present' %}
+                        Présent
+                    {% elif record.status == 'absent' %}
+                        Absent
+                    {% elif record.status == 'justified' %}
+                        Justifié
+                    {% else %}
+                        {{ record.status }}
+                    {% endif %}
+                </span>
+            </div>
+            
+            {% if record.status == 'absent' and record.justification_status %}
+            <div class="justification-section">
+                <h3><i class="fas fa-file-medical"></i> Justification</h3>
+                <div class="detail-row">
+                    <span class="detail-label">Type:</span>
+                    <span class="detail-value">
+                        {% if record.reason_type == 'medical' %}
+                            Certificat médical
+                        {% elif record.reason_type == 'family' %}
+                            Raison familiale
+                        {% elif record.reason_type == 'transport' %}
+                            Problème de transport
+                        {% elif record.reason_type == 'administrative' %}
+                            Démarche administrative
+                        {% elif record.reason_type == 'other' %}
+                            Autre
+                        {% else %}
+                            {{ record.reason_type }}
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Statut:</span>
+                    <span class="detail-value">
+                        {% if record.justification_status == 'validee' %}
+                            <span style="color: green;">Validée</span>
+                        {% elif record.justification_status == 'refusee' %}
+                            <span style="color: red;">Refusée</span>
+                        {% else %}
+                            En attente
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Description:</span>
+                    <span class="detail-value">{{ record.justification_desc or 'Non fournie' }}</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

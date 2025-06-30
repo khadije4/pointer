@@ -54,6 +54,7 @@
                 <span id="qr-placeholder-text">Sélectionnez un cours</span>
                 <img id="qr-code-img" class="qr-code-img" style="display: none;" alt="QR Code">
             </div>
+            
 
             <div style="text-align: center;">
                 <button class="btn" onclick="generateQR()" id="generate-btn" disabled>
@@ -355,7 +356,7 @@
                     
                     return `
                         <div class="student-row">
-                            <div class="student-name">${student.prenom} ${student.nom}</div>
+                            <div class="student-name"> ${student.nom} ${student.prenom}</div>
                             <div class="attendance-controls">
                                 <button class="btn success ${currentStatus === 'present' ? 'btn-active' : ''}" 
                                         onclick="setStudentAttendance(${student.id}, 'present')"
@@ -417,7 +418,7 @@
                     eleve_id: student.id,
                     course_id: currentCourseId,
                     status: student.manualStatus,
-                    heure_presence: student.manualStatus === 'present' ? currentTime : null
+                    heure_presence: currentTime 
                 }));
 
                 // Send to backend
@@ -505,7 +506,7 @@
                                  record.status === 'justified' ? 'Justifié' : 'Absent';
 
                 row.innerHTML = `
-                    <td>${record.eleve_prenom} ${record.eleve_nom}</td>
+                    <td> ${record.eleve_nom} ${record.eleve_prenom}</td>
                     <td>${record.date_presence}</td>
                     <td>${record.heure_presence || '-'}</td>
                     <td><span class="${statusClass}">${statusText}</span></td>
@@ -584,7 +585,7 @@
                 const statusText = record.status === 'present' ? 'Présent' : 'Absent';
 
                 row.innerHTML = `
-                    <td>${record.eleve_prenom} ${record.eleve_nom}</td>
+                    <td> ${record.eleve_nom} ${record.eleve_prenom}</td>
                     <td>${record.heure_presence || '-'}</td>
                     <td><span class="${statusClass}">${statusText}</span></td>
                 `;
@@ -599,7 +600,7 @@
             // Calculate absence rates
             const studentStats = {};
             attendance.forEach(record => {
-                const studentKey = `${record.eleve_prenom} ${record.eleve_nom}`;
+                const studentKey = ` ${record.eleve_nom} ${record.eleve_prenom}`;
                 if (!studentStats[studentKey]) {
                     studentStats[studentKey] = { total: 0, present: 0 };
                 }

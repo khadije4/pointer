@@ -6,7 +6,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/student_dashboard.css') }}">
     <title>Dashboard Étudiant - Gestion de Pointage</title>
-
+    <!-- Include the QR scanner library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
 <body>
     <div class="header">
@@ -14,9 +15,9 @@
             <h1>Tableau de Bord</h1>
             <p>Bienvenue, {{ session.user_name }} - Matricule: {{ session.matricule }}</p>
         </div>
-        <div class="user-info">
-            <i class="fas fa-user-circle"></i>
-            <span>Étudiant</span>
+        <div class="user-info" style="cursor:pointer;" onclick="window.location.href='{{ url_for('student_profile') }}'">
+            <i class="fas fa-user-tie"></i>
+            <span>{{ session.user_name }}</span>
         </div>
         <form action="{{ url_for('logout') }}" method="get" style="display: inline;">
             <button type="submit" class="logout-btn">
@@ -81,16 +82,27 @@
             <h2><i class="fas fa-qrcode"></i> Scanner QR</h2>
             <p style="color: #666; margin-bottom: 20px;">Scannez le code pour marquer votre présence</p>
             
-            <div class="qr-scanner" onclick="openQRInput()">
-                <i class="fas fa-qrcode"></i>
+            <div id="scanner-container" style="display: none;">
+                <div id="video-container" style="position: relative; width: 100%; height: 300px;">
+                    <video id="qr-video" width="100%" height="100%" style="border-radius: 8px;"></video>
+                    <div id="scan-region" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 200px; height: 200px; border: 3px dashed #00a86b;"></div>
+                </div>
+                <div id="camera-controls" style="margin-top: 10px; text-align: center;">
+                    <select id="camera-select" style="padding: 8px; border-radius: 4px; margin-right: 10px;"></select>
+                    <button onclick="stopCamera()" style="background: #ff6b6b; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">
+                        <i class="fas fa-stop"></i> Arrêter
+                    </button>
+                </div>
             </div>
             
-            <button class="scan-btn" onclick="openQRInput()">
-                <i class="fas fa-keyboard"></i> Saisir Code QR
-            </button>
+            <div class="qr-scanner" id="scanner-button" onclick="startCamera()">
+                <i class="fas fa-camera"></i>
+                <p style="margin-top: 10px; font-size: 14px;">Cliquez pour activer la caméra</p>
+            </div>
+            
+            
             
             <div id="scan-result" style="margin-top: 15px; font-weight: 600;"></div>
-            
             
             <div id="qr-input-container" style="display: none; margin-top: 20px;">
                 <input type="text" id="qr-input" placeholder="Entrez le code QR" style="
@@ -158,7 +170,10 @@
                     </div>
                     <div class="activity-details">
                         <h4>{{ attendance.nom_cours }}</h4>
-                        <p>{{ attendance.date_presence }} {{ attendance.heure_presence.strftime('%H:%M') if attendance.heure_presence else '' }} - Prof. {{ attendance.prof_prenom }} {{ attendance.prof_nom }}</p>
+                        <p>{{ attendance.date_presence }} 
+   {% if attendance.heure_presence %}
+       {{ attendance.heure_presence.strftime('%H:%M') if attendance.heure_presence else '' }}
+   {% endif %} - Prof.  {{ attendance.prof_nom }} {{ attendance.prof_prenom }}</p>
                     </div>
                     <span class="status-badge status-{{ attendance.status }}">
                         {% if attendance.status == 'present' %}
@@ -194,7 +209,7 @@
             <p>Soumettre un justificatif</p>
         </div>
         
-        <div class="action-card" onclick="window.location.href='{{ url_for('mon_planning') }}'">
+        <div class="action-card" onclick="window.location.href='{{ url_for('student_planning') }}'">
             <i class="fas fa-clock"></i>
             <h3>Mon Planning</h3>
             <p>Voir les cours à venir</p>
@@ -221,29 +236,138 @@
             }, 500);
         });
 
-        function openQRInput() {
-            document.getElementById('qr-input-container').style.display = 'block';
-            document.getElementById('qr-input').focus();
-        }
+        // QR Scanner functionality
+        let videoStream = null;
+        let currentCameraId = null;
+        let scanningActive = false;
+        let qrScanInterval = null;
 
-        function cancelQRInput() {
-            document.getElementById('qr-input-container').style.display = 'none';
-            document.getElementById('qr-input').value = '';
+        async function startCamera() {
+            try {
+                // Hide the scanner button and show the video container
+                document.getElementById('scanner-button').style.display = 'none';
+                document.getElementById('scanner-container').style.display = 'block';
+                
+                // Get available cameras
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                // Populate camera select
+                const cameraSelect = document.getElementById('camera-select');
+                cameraSelect.innerHTML = '';
+                videoDevices.forEach((device, i) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Camera ${i + 1}`;
+                    cameraSelect.appendChild(option);
+                });
+                
+                // Start with the first camera
+                if (videoDevices.length > 0) {
+                    currentCameraId = videoDevices[0].deviceId;
+                    await initCamera(currentCameraId);
+                } else {
+                    throw new Error('No cameras found');
+                }
+                
+                // Setup camera change handler
+                cameraSelect.onchange = async () => {
+                    currentCameraId = cameraSelect.value;
+                    await initCamera(currentCameraId);
+                };
+                
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                document.getElementById('scan-result').innerHTML = 
+                    `<span style="color: #ff6b6b;"><i class="fas fa-exclamation-circle"></i> Erreur d'accès à la caméra: ${error.message}</span>`;
+                
+                // Show the scanner button again
+                document.getElementById('scanner-button').style.display = 'flex';
+                document.getElementById('scanner-container').style.display = 'none';
+            }
+        }
+        
+        async function initCamera(deviceId) {
+            // Stop any existing stream
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+            }
+            
+            // Start new stream
+            videoStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    deviceId: { exact: deviceId },
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            });
+            
+            const video = document.getElementById('qr-video');
+            video.srcObject = videoStream;
+            video.play();
+            
+            // Start QR scanning
+            startQRScanning();
+        }
+        
+        function startQRScanning() {
+            const video = document.getElementById('qr-video');
+            const canvas = document.createElement('canvas');
+            const canvasContext = canvas.getContext('2d');
+            scanningActive = true;
+            
+            function scanQR() {
+                if (!scanningActive) return;
+                
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: 'dontInvert',
+                    });
+                    
+                    if (code) {
+                        handleQRCodeResult(code.data);
+                    }
+                }
+                
+                if (scanningActive) {
+                    requestAnimationFrame(scanQR);
+                }
+            }
+            
+            scanQR();
+        }
+        
+        function stopCamera() {
+            scanningActive = false;
+            
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            
+            const video = document.getElementById('qr-video');
+            video.srcObject = null;
+            
+            document.getElementById('scanner-container').style.display = 'none';
+            document.getElementById('scanner-button').style.display = 'flex';
             document.getElementById('scan-result').innerHTML = '';
         }
-
-        function submitQRCode() {
-            const qrToken = document.getElementById('qr-input').value.trim().toUpperCase();
+        
+        function handleQRCodeResult(qrData) {
             const resultDiv = document.getElementById('scan-result');
             
-            if (!qrToken) {
-                resultDiv.innerHTML = '<span style="color: #ff6b6b;"><i class="fas fa-exclamation-circle"></i> Veuillez entrer un code QR</span>';
-                return;
-            }
-
             // Show loading
             resultDiv.innerHTML = '<span style="color: #666;"><i class="fas fa-spinner fa-spin"></i> Vérification en cours...</span>';
-
+            
+            // Stop camera
+            stopCamera();
+            
             // Send to backend
             fetch('{{ url_for("scan_qr") }}', {
                 method: 'POST',
@@ -251,7 +375,7 @@
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    qr_token: qrToken
+                    qr_token: qrData
                 })
             })
             .then(response => response.json())
@@ -270,8 +394,22 @@
                 console.error('Error:', error);
                 resultDiv.innerHTML = '<span style="color: #ff6b6b;"><i class="fas fa-exclamation-circle"></i> Erreur de connexion</span>';
             });
+        }
 
-            // Hide input after submission
+        function openQRInput() {
+            document.getElementById('qr-input-container').style.display = 'block';
+            document.getElementById('qr-input').focus();
+        }
+
+        function cancelQRInput() {
+            document.getElementById('qr-input-container').style.display = 'none';
+            document.getElementById('qr-input').value = '';
+            document.getElementById('scan-result').innerHTML = '';
+        }
+
+        function submitQRCode() {
+            const qrToken = document.getElementById('qr-input').value.trim().toUpperCase();
+            handleQRCodeResult(qrToken);
             document.getElementById('qr-input-container').style.display = 'none';
             document.getElementById('qr-input').value = '';
         }
@@ -284,5 +422,4 @@
         });
     </script>
 </body>
-
 </html>

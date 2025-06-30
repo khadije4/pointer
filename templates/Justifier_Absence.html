@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-    <link rel="stylesheet" href="Justifier_Absence.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/Justifier_Absence.css') }}">
     <title>Justifier Absence - Gestion de Pointage</title>
 </head>
 
@@ -14,7 +14,7 @@
             <h1>Justifier Absence</h1>
             <p>Soumettre un justificatif d'absence - <span id="studentName">Chargement...</span></p>
         </div>
-        <a href="etudiant_dashboard.html" class="back-btn">
+        <a href="{{ url_for('student_dashboard') }}" class="back-btn">
             <i class="fas fa-arrow-left"></i> Retour au Dashboard
         </a>
     </div>

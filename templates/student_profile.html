@@ -1,5 +1,4 @@
->Mon Profil - Gestion de Pointage</title>
-</head>
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -30,7 +29,7 @@
                 </div>
             </div>
             <div class="profile-info">
-                <h2>{{ session.user_name or 'Nom non disponible' }}</h2>
+                <h2>{{ session['user_name'] or 'Nom non disponible' }}</h2>
                 <p class="student-id">ID: {{ session.matricule or 'Non défini' }}</p>
                 <div class="profile-badges">
                     <span class="badge badge-active">Actif</span>
@@ -47,9 +46,7 @@
             <button class="tab-btn" onclick="showTab('academic')">
                 <i class="fas fa-graduation-cap"></i> Informations Académiques
             </button>
-            <button class="tab-btn" onclick="showTab('justifications')">
-                <i class="fas fa-file-alt"></i> Justificatifs
-            </button>
+            
         </div>
 
         <!-- Personal Info Tab -->
@@ -67,43 +64,34 @@
                     {% endif %}
                 {% endwith %}
 
-                <form class="profile-form" method="POST" action="{{ url_for('update_student_profile') }}">
+                <form class="profile-form" id="profileForm" action="{{ url_for('update_student_profile') }}" method="POST">
                     <div class="form-row">
                         <div class="form-group">
                             <label for="prenom">Prénom</label>
-                            <input type="text" id="prenom" name="prenom" value="{{ student_info.prenom if student_info else '' }}" readonly>
+                            <input type="text" id="prenom" name="prenom" value="{{ student.prenom }}" readonly>
                         </div>
                         <div class="form-group">
                             <label for="nom">Nom</label>
-                            <input type="text" id="nom" name="nom" value="{{ student_info.nom if student_info else '' }}" readonly>
+                            <input type="text" id="nom" name="nom" value="{{ student.nom }}" readonly>
                         </div>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="matricule">Matricule</label>
-                            <input type="text" id="matricule" name="matricule" value="{{ student_info.matricule if student_info else '' }}" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label for="nni">NNI</label>
-                            <input type="text" id="nni" name="nni" value="{{ student_info.nni if student_info else '' }}" readonly>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="email">Email</label>
-                            <input type="email" id="email" name="email" value="{{ student_info.email if student_info else '' }}" readonly>
-                            <i class="fas fa-edit edit-icon" onclick="enableEdit('email')"></i>
-                        </div>
-                        <div class="form-group">
-                            <label for="telephone">Téléphone</label>
-                            <input type="tel" id="telephone" name="telephone" value="{{ student_info.telephone if student_info else '' }}" readonly>
-                            <i class="fas fa-edit edit-icon" onclick="enableEdit('telephone')"></i>
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <div class="input-group">
+                            <input type="email" id="email" name="email" value="{{ student.email }}" readonly>
+                            <span class="edit-icon" data-field="email">
+                                <i class="fas fa-edit"></i>
+                            </span>
                         </div>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="classe">Classe</label>
-                            <input type="text" id="classe" name="classe" value="{{ student_info.classe if student_info else '' }}" readonly>
+                    
+                    <div class="form-group">
+                        <label for="telephone">Téléphone</label>
+                        <div class="input-group">
+                            <input type="tel" id="telephone" name="telephone" value="{{ student.telephone }}" readonly>
+                            <span class="edit-icon" data-field="telephone">
+                                <i class="fas fa-edit"></i>
+                            </span>
                         </div>
                     </div>
                 </form>
@@ -121,8 +109,8 @@
                             <h4>Formation Actuelle</h4>
                         </div>
                         <div class="card-content">
-                            <p><strong>Classe:</strong> {{ student_info.classe if student_info else 'Non défini' }}</p>
-                            <p><strong>Matricule:</strong> {{ student_info.matricule if student_info else 'Non défini' }}</p>
+                            <p><strong>Classe:</strong> {{ student.classe if student else 'Non défini' }}</p>
+                            <p><strong>Matricule:</strong> {{ student.matricule if student else 'Non défini' }}</p>
                             <p><strong>Statut:</strong> Actif</p>
                         </div>
                     </div>
@@ -163,75 +151,16 @@
             </div>
         </div>
 
-        <!-- Justifications Tab -->
-        <div id="justifications-tab" class="tab-content">
-            <div class="form-section">
-                <h3><i class="fas fa-file-alt"></i> Gestion des Justificatifs</h3>
-                
-                <!-- Submit Justification Form -->
-                <div class="justification-form-section">
-                    <h4>Soumettre un Justificatif</h4>
-                    <form id="justificationForm" enctype="multipart/form-data">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="attendance_id">Absence à Justifier</label>
-                                <select id="attendance_id" name="attendance_id" required>
-                                    <option value="">Sélectionner une absence</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="reason_type">Type de Justificatif</label>
-                                <select id="reason_type" name="reason_type" required>
-                                    <option value="">Sélectionner un type</option>
-                                    <option value="medical">Médical</option>
-                                    <option value="family">Familial</option>
-                                    <option value="transport">Transport</option>
-                                    <option value="autre">Autre</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="custom_reason">Raison Personnalisée (si "Autre")</label>
-                                <input type="text" id="custom_reason" name="custom_reason">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="description">Description</label>
-                                <textarea id="description" name="description" rows="3" required></textarea>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="document">Document Justificatif (PDF, JPG, PNG)</label>
-                                <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png">
-                            </div>
-                        </div>
-                        <button type="submit" class="btn-primary">
-                            <i class="fas fa-paper-plane"></i> Soumettre Justificatif
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Justifications History -->
-                <div class="justifications-history">
-                    <h4>Historique des Justificatifs</h4>
-                    <div id="justifications-list">
-                        <!-- Will be populated by JavaScript -->
-                    </div>
-                </div>
-            </div>
-        </div>
+        
     </div>
 
     <!-- Action Buttons -->
     <div class="action-buttons">
-        <button class="btn-secondary" onclick="cancelChanges()">
+        <button class="btn-secondary" id="cancelBtn">
             <i class="fas fa-times"></i> Annuler
         </button>
-        <button class="btn-primary" onclick="saveChanges()">
-            <i class="fas fa-save"></i> Sauvegarder les Modifications
+        <button class="btn-primary" id="saveBtn">
+            <i class="fas fa-save"></i> Sauvegarder
         </button>
     </div>
 
@@ -245,7 +174,7 @@
             buttons.forEach(btn => btn.classList.remove('active'));
             
             document.getElementById(tabName + '-tab').classList.add('active');
-            event.target.classList.add('active');
+            event.currentTarget.classList.add('active');
 
             // Load tab-specific data
             if (tabName === 'justifications') {
@@ -253,139 +182,160 @@
             }
         }
 
-        // Enable field editing
-        function enableEdit(fieldId) {
-            const field = document.getElementById(fieldId);
-            field.removeAttribute('readonly');
-            field.focus();
-            field.style.borderColor = '#00a86b';
-        }
+        document.addEventListener('DOMContentLoaded', function() {
+            const editButtons = document.querySelectorAll('.edit-icon');
+            const saveBtn = document.getElementById('saveBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            let originalValues = {};
 
-        // Save changes
-        function saveChanges() {
-            const form = document.querySelector('.profile-form');
-            const formData = new FormData(form);
-            
-            fetch('{{ url_for("update_student_profile") }}', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Modifications sauvegardées avec succès !');
-                    location.reload();
-                } else {
-                    alert('Erreur: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Erreur lors de la sauvegarde');
+            // Enable editing for clicked field
+            editButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const fieldId = this.getAttribute('data-field');
+                    const input = document.getElementById(fieldId);
+                    
+                    // Store original value
+                    originalValues[fieldId] = input.value;
+                    
+                    // Enable editing
+                    input.removeAttribute('readonly');
+                    input.focus();
+                    input.classList.add('editing');
+                    
+                    // Show save/cancel buttons
+                    document.querySelector('.action-buttons').style.display = 'block';
+                });
             });
-        }
 
-        // Cancel changes
-        function cancelChanges() {
-            if (confirm('Êtes-vous sûr de vouloir annuler les modifications ?')) {
-                location.reload();
-            }
-        }
+            // Save changes
+            saveBtn.addEventListener('click', function() {
+                const formData = {
+                    email: document.getElementById('email').value,
+                    telephone: document.getElementById('telephone').value
+                };
 
-        // Load justification data
-        function loadJustificationData() {
-            // Load available absent courses
-            fetch('/api/student_absent_courses')
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById('attendance_id');
-                    select.innerHTML = '<option value="">Sélectionner une absence</option>';
-                    
-                    data.forEach(absence => {
-                        const option = document.createElement('option');
-                        option.value = absence.attendance_id;
-                        option.textContent = `${absence.nom_cours} - ${absence.date_presence} ${absence.heure_presence}`;
-                        select.appendChild(option);
-                    });
+                fetch('/update_student_profile', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
                 })
-                .catch(error => console.error('Error loading absent courses:', error));
-
-            // Load justifications history
-            fetch('/api/student_justifications')
                 .then(response => response.json())
                 .then(data => {
-                    const listContainer = document.getElementById('justifications-list');
-                    listContainer.innerHTML = '';
-                    
-                    if (data.length === 0) {
-                        listContainer.innerHTML = '<p>Aucun justificatif soumis</p>';
-                        return;
+                    if (data.success) {
+                        alert(data.message);
+                        // Disable fields after saving
+                        document.querySelectorAll('.editing').forEach(el => {
+                            el.setAttribute('readonly', true);
+                            el.classList.remove('editing');
+                        });
+                        // Hide buttons
+                        document.querySelector('.action-buttons').style.display = 'none';
+                    } else {
+                        alert('Error: ' + data.message);
+                        // Revert to original values on error
+                        for (const [fieldId, value] of Object.entries(originalValues)) {
+                            document.getElementById(fieldId).value = value;
+                        }
                     }
-                    
-                    data.forEach(justification => {
-                        const statusClass = justification.status === 'validee' ? 'success' : 
-                                          justification.status === 'refusee' ? 'error' : 'pending';
-                        
-                        const justificationDiv = document.createElement('div');
-                        justificationDiv.className = 'justification-item';
-                        justificationDiv.innerHTML = `
-                            <div class="justification-header">
-                                <h5>${justification.nom_cours}</h5>
-                                <span class="status-badge status-${statusClass}">${justification.status}</span>
-                            </div>
-                            <div class="justification-details">
-                                <p><strong>Date:</strong> ${justification.date_presence}</p>
-                                <p><strong>Type:</strong> ${justification.reason_type}</p>
-                                <p><strong>Description:</strong> ${justification.description}</p>
-                                <p><strong>Soumis le:</strong> ${new Date(justification.created_at).toLocaleDateString()}</p>
-                            </div>
-                        `;
-                        listContainer.appendChild(justificationDiv);
-                    });
                 })
-                .catch(error => console.error('Error loading justifications:', error));
-        }
-
-        // Handle justification form submission
-        document.getElementById('justificationForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            
-            fetch('/submit_justification', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    this.reset();
-                    loadJustificationData(); // Reload data
-                } else {
-                    alert('Erreur: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Erreur lors de la soumission');
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to update profile');
+                });
             });
-        });
 
-        // Animation on load
-        window.addEventListener('load', () => {
-            const cards = document.querySelectorAll('.academic-card');
-            cards.forEach((card, index) => {
-                setTimeout(() => {
-                    card.style.opacity = '0';
-                    card.style.transform = 'translateY(20px)';
-                    card.style.transition = 'all 0.5s ease';
-                    
-                    setTimeout(() => {
-                        card.style.opacity = '1';
-                        card.style.transform = 'translateY(0)';
-                    }, 100);
-                }, index * 150);
+            // Cancel editing
+            cancelBtn.addEventListener('click', function() {
+                // Revert to original values
+                for (const [fieldId, value] of Object.entries(originalValues)) {
+                    document.getElementById(fieldId).value = value;
+                    document.getElementById(fieldId).setAttribute('readonly', true);
+                    document.getElementById(fieldId).classList.remove('editing');
+                }
+                // Hide buttons
+                document.querySelector('.action-buttons').style.display = 'none';
+            });
+
+            // Load justification data
+            function loadJustificationData() {
+                // Load available absent courses
+                fetch('/api/student_absent_courses')
+                    .then(response => response.json())
+                    .then(data => {
+                        const select = document.getElementById('attendance_id');
+                        select.innerHTML = '<option value="">Sélectionner une absence</option>';
+                        
+                        data.forEach(absence => {
+                            const option = document.createElement('option');
+                            option.value = absence.attendance_id;
+                            option.textContent = `${absence.nom_cours} - ${absence.date_presence} ${absence.heure_presence}`;
+                            select.appendChild(option);
+                        });
+                    })
+                    .catch(error => console.error('Error loading absent courses:', error));
+
+                // Load justifications history
+                fetch('/api/student_justifications')
+                    .then(response => response.json())
+                    .then(data => {
+                        const listContainer = document.getElementById('justifications-list');
+                        listContainer.innerHTML = '';
+                        
+                        if (data.length === 0) {
+                            listContainer.innerHTML = '<p>Aucun justificatif soumis</p>';
+                            return;
+                        }
+                        
+                        data.forEach(justification => {
+                            const statusClass = justification.status === 'validee' ? 'success' : 
+                                            justification.status === 'refusee' ? 'error' : 'pending';
+                            
+                            const justificationDiv = document.createElement('div');
+                            justificationDiv.className = 'justification-item';
+                            justificationDiv.innerHTML = `
+                                <div class="justification-header">
+                                    <h5>${justification.nom_cours}</h5>
+                                    <span class="status-badge status-${statusClass}">${justification.status}</span>
+                                </div>
+                                <div class="justification-details">
+                                    <p><strong>Date:</strong> ${justification.date_presence}</p>
+                                    <p><strong>Type:</strong> ${justification.reason_type}</p>
+                                    <p><strong>Description:</strong> ${justification.description}</p>
+                                    <p><strong>Soumis le:</strong> ${new Date(justification.created_at).toLocaleDateString()}</p>
+                                </div>
+                            `;
+                            listContainer.appendChild(justificationDiv);
+                        });
+                    })
+                    .catch(error => console.error('Error loading justifications:', error));
+            }
+
+            // Handle justification form submission
+            document.getElementById('justificationForm')?.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                
+                fetch('/submit_justification', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        this.reset();
+                        loadJustificationData(); // Reload data
+                    } else {
+                        alert('Erreur: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Erreur lors de la soumission');
+                });
             });
         });
     </script>

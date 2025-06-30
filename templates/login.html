@@ -7,11 +7,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
     <title>Gestion de Pointage</title>
+    
 </head>
 
 <body>
     <div class="container">
-        <!-- Sign In Form -->
+        
         <div class="form-container sign-in">
             <form method="POST" action="/login" id="loginForm">
                 <div class="logo">
@@ -36,9 +37,18 @@
                         placeholder="Entrez votre matricule" 
                         required
                         autocomplete="username"
+                        value="{{ matricule_value or '' }}"
+                    placeholder="Entrez votre matricule" 
+                    required
+                    class="{% if error_field == 'matricule' %}error-field{% endif %}"
                     >
+                    {% if error_field == 'matricule' %}
+                    <div class="field-error">
+                        <i class="fas fa-exclamation-circle"></i> Matricule incorrect
+                    </div>
+                {% endif %}
                 </div>
-
+                
                 <div class="form-group">
                     <label for="nni">
                         <i class="fas fa-key"></i> NNI (Numéro National d'Identité)
@@ -47,10 +57,17 @@
                         type="password" 
                         id="nni" 
                         name="nni" 
-                        placeholder="Entrez votre NNI" 
-                        required
-                        autocomplete="current-password"
+                        
+                        value="{{ nni_value or '' }}"
+                    placeholder="Entrez votre NNI" 
+                    required
+                    class="{% if error_field == 'nni' %}error-field{% endif %}"
                     >
+                    {% if error_field == 'nni' %}
+                    <div class="field-error">
+                        <i class="fas fa-exclamation-circle"></i> Matricule incorrect
+                    </div>
+                {% endif %}
                 </div>
 
                 <button type="submit" class="login-button" id="loginButton">

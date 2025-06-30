@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/student_planning.css') }}">
+    <title>Mon Planning - Gestion de Pointage</title>
+    <style>
+        .current-class {
+            background-color: #ffeb3b;
+            box-shadow: 0 0 10px rgba(255, 235, 59, 0.5);
+        }
+        .course-cell {
+            background-color: #f5f5f5;
+            padding: 8px;
+            border-radius: 4px;
+            position: relative;
+        }
+        .empty-cell {
+            background-color: #f9f9f9;
+            color: #999;
+        }
+        .course-name {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .course-location {
+            font-size: 0.9em;
+            color: #555;
+        }
+        .course-prof {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 4px;
+        }
+        .course-type {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            font-size: 0.8em;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        .type-cours {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        .type-td {
+            background-color: #e8f5e9;
+            color: #388e3c;
+        }
+        .type-tp {
+            background-color: #fff3e0;
+            color: #ef6c00;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="welcome">
+            <h1>Mon Planning</h1>
+            <p>Emploi du temps - {{ student.prenom }} {{ student.nom }} - {{ student.classe }}</p>
+        </div>
+        <a href="{{ url_for('student_dashboard') }}" class="back-btn">
+            <i class="fas fa-arrow-left"></i> Retour au Dashboard
+        </a>
+    </div>
+
+    <div class="planning-container">
+        <div class="planning-header">
+            <h2 class="planning-title">
+                <i class="fas fa-calendar-alt"></i>
+                Emploi du Temps
+            </h2>
+            <div class="semester-info">
+                {{ student.classe }} : Emploi du Temps S4
+            </div>
+        </div>
+
+        <table class="schedule-table">
+            <thead>
+                <tr>
+                    <th>Horaire</th>
+                    <th>Lundi</th>
+                    <th>Mardi</th>
+                    <th>Mercredi</th>
+                    <th>Jeudi</th>
+                    <th>Vendredi</th>
+                    <th>Samedi</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Define time slots -->
+                {% set time_slots = [
+                    ('08:30', '10:30'),
+                    ('10:30', '12:30'),
+                    ('12:30', '14:00'),
+                    ('14:00', '16:00'),
+                    ('16:00', '18:00')
+                ] %}
+                
+                {% for start_time, end_time in time_slots %}
+                
+                <tr>
+                    <td class="time-slot">{{ start_time }}-{{ end_time }}</td>
+                    
+                    <!-- Monday -->
+                    <td class="{{ 'empty-cell' if not find_course(schedule.Monday, start_time, end_time) else 'course-cell' }}">
+                        {% set course = find_course(schedule.Monday, start_time, end_time) %}
+                        {% if course %}
+                        <div class="course-name">{{ course.course_name }}</div>
+                        <div class="course-location">Salle: {{ course.room }}</div>
+                        <div class="course-prof">Prof: {{ course.prof_name }}</div>
+                        <span class="course-type type-{{ course.type|lower }}">{{ course.type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    
+                    <!-- Tuesday -->
+                    <td class="{{ 'empty-cell' if not find_course(schedule.Tuesday, start_time, end_time) else 'course-cell' }}">
+                        {% set course = find_course(schedule.Tuesday, start_time, end_time) %}
+                        {% if course %}
+                        <div class="course-name">{{ course.course_name }}</div>
+                        <div class="course-location">Salle: {{ course.room }}</div>
+                        <div class="course-prof">Prof: {{ course.prof_name }}</div>
+                        <span class="course-type type-{{ course.type|lower }}">{{ course.type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    
+                    <!-- Wednesday -->
+                    <td class="{{ 'empty-cell' if not find_course(schedule.Wednesday, start_time, end_time) else 'course-cell' }}">
+                        {% set course = find_course(schedule.Wednesday, start_time, end_time) %}
+                        {% if course %}
+                        <div class="course-name">{{ course.course_name }}</div>
+                        <div class="course-location">Salle: {{ course.room }}</div>
+                        <div class="course-prof">Prof: {{ course.prof_name }}</div>
+                        <span class="course-type type-{{ course.type|lower }}">{{ course.type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    
+                    <!-- Thursday -->
+                    <td class="{{ 'empty-cell' if not find_course(schedule.Thursday, start_time, end_time) else 'course-cell' }}">
+                        {% set course = find_course(schedule.Thursday, start_time, end_time) %}
+                        {% if course %}
+                        <div class="course-name">{{ course.course_name }}</div>
+                        <div class="course-location">Salle: {{ course.room }}</div>
+                        <div class="course-prof">Prof: {{ course.prof_name }}</div>
+                        <span class="course-type type-{{ course.type|lower }}">{{ course.type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    
+                    <!-- Friday -->
+                    <td class="{{ 'empty-cell' if not find_course(schedule.Friday, start_time, end_time) else 'course-cell' }}">
+                        {% set course = find_course(schedule.Friday, start_time, end_time) %}
+                        {% if course %}
+                        <div class="course-name">{{ course.course_name }}</div>
+                        <div class="course-location">Salle: {{ course.room }}</div>
+                        <div class="course-prof">Prof: {{ course.prof_name }}</div>
+                        <span class="course-type type-{{ course.type|lower }}">{{ course.type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    
+                    <!-- Saturday -->
+                    <td class="{{ 'empty-cell' if not find_course(schedule.Saturday, start_time, end_time) else 'course-cell' }}">
+                        {% set course = find_course(schedule.Saturday, start_time, end_time) %}
+                        {% if course %}
+                        <div class="course-name">{{ course.course_name }}</div>
+                        <div class="course-location">Salle: {{ course.room }}</div>
+                        <div class="course-prof">Prof: {{ course.prof_name }}</div>
+                        <span class="course-type type-{{ course.type|lower }}">{{ course.type }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="stats-grid">
+        
+    
+        <div class="stat-card">
+            <div class="stat-number">{{ unique_rooms|length if unique_rooms else 0 }}</div>
+            <div class="stat-label">Salles différentes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ unique_labs|length if unique_labs else 0 }}</div>
+            <div class="stat-label">Laboratoires utilisés</div>
+        </div>
+    </div>
+
+    <script>
+        function highlightCurrentClass() {
+            const now = new Date();
+            const currentHour = now.getHours();
+            const currentMinutes = now.getMinutes();
+            const currentTime = currentHour * 60 + currentMinutes;
+            
+            let currentDay = now.getDay() - 1;
+            if (currentDay < 0) currentDay = 5;
+            
+            const timeSlots = [
+                {start: 8*60 + 30, end: 10*60 + 30},
+                {start: 10*60 + 30, end: 12*60 + 30},
+                {start: 12*60 + 30, end: 14*60 + 0},
+                {start: 14*60 + 0, end: 16*60 + 0},
+                {start: 16*60 + 0, end: 18*60 + 0}
+            ];
+            
+            let currentSlot = -1;
+            for (let i = 0; i < timeSlots.length; i++) {
+                if (currentTime >= timeSlots[i].start && currentTime < timeSlots[i].end) {
+                    currentSlot = i;
+                    break;
+                }
+            }
+            
+            if (currentSlot >= 0 && currentDay >= 0 && currentDay <= 5) {
+                const rows = document.querySelectorAll('.schedule-table tbody tr');
+                if (rows[currentSlot]) {
+                    const cells = rows[currentSlot].querySelectorAll('td');
+                    if (cells.length > currentDay + 1) {
+                        cells[currentDay + 1].classList.add('current-class');
+                    }
+                }
+            }
+        }
+        
+        window.addEventListener('load', () => {
+            const cards = document.querySelectorAll('.stat-card');
+            cards.forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateY(20px)';
+                    card.style.transition = 'all 0.5s ease';
+                    
+                    setTimeout(() => {
+                        card.style.opacity = '1';
+                        card.style.transform = 'translateY(0)';
+                    }, 100);
+                }, index * 100);
+            });
+            
+            highlightCurrentClass();
+        });
+    </script>
+</body>
+</html>

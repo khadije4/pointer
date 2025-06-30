@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* Your existing CSS styles */
         body { background-color: #f8f9fa; min-height: 100vh; padding: 15px; font-family: 'Montserrat', Arial, sans-serif; }
         .header { background: white; border-radius: 20px; padding: 25px; margin-bottom: 25px; box-shadow: 0 2px 20px rgba(0,0,0,0.08); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
         .header .welcome { flex: 1; }
@@ -28,14 +29,16 @@
         .btn.danger:hover { background: #c0392b; }
         .btn.warning { background: #f39c12; }
         .btn.warning:hover { background: #e67e22; }
+        .btn.secondary { background: #95a5a6; }
+        .btn.secondary:hover { background: #7f8c8d; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
         th { background: #f5f5f5; }
         .notif { background: #ffe0e0; color: #c0392b; padding: 8px 12px; border-radius: 5px; margin-bottom: 8px; }
         .comment-box { width: 100%; border-radius: 6px; border: 1px solid #ddd; padding: 6px; margin-top: 6px; }
         .search-box { width: 100%; padding: 8px; margin-bottom: 15px; border-radius: 5px; border: 1px solid #ddd; }
-        .tab-navigation { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab-btn { padding: 10px 20px; background: #ddd; border: none; border-radius: 5px; cursor: pointer; }
+        .tab-navigation { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab-btn { padding: 10px 20px; background: #ddd; border: none; border-radius: 5px; cursor: pointer; white-space: nowrap; }
         .tab-btn.active { background: #00a86b; color: white; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
@@ -43,7 +46,7 @@
         .form-row { display: flex; gap: 15px; margin-bottom: 15px; }
         .form-group { flex: 1; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
-        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; }
         .status-pending { color: #f39c12; }
         .status-approved { color: #27ae60; }
         .status-rejected { color: #e74c3c; }
@@ -51,11 +54,17 @@
         .flash-success { background: #d4edda; color: #155724; padding: 10px 15px; border-radius: 4px; margin-bottom: 10px; }
         .flash-error { background: #f8d7da; color: #721c24; padding: 10px 15px; border-radius: 4px; margin-bottom: 10px; }
         .flash-warning { background: #fff3cd; color: #856404; padding: 10px 15px; border-radius: 4px; margin-bottom: 10px; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
-        .modal-content { background: white; margin: 10% auto; padding: 20px; border-radius: 10px; width: 50%; max-width: 600px; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px; }
+        .section-header h2 { margin: 0; }
+        
+        /* Modal styles */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); }
+        .modal-content { background-color: #fff; margin: 5% auto; padding: 20px; width: 80%; max-width: 800px; border-radius: 5px; }
+        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover { color: black; }
+        
         @media (max-width: 900px) { 
             .dashboard-grid { grid-template-columns: 1fr; } 
-            .modal-content { width: 90%; }
         }
     </style>
 </head>
@@ -86,6 +95,12 @@
         <button class="tab-btn" onclick="openTab('students')">
             <i class="fas fa-users"></i> Élèves
         </button>
+        <button class="tab-btn" onclick="openTab('professors')">
+            <i class="fas fa-chalkboard-teacher"></i> Professeurs
+        </button>
+        <button class="tab-btn" onclick="openTab('courses')">
+            <i class="fas fa-book"></i> Cours
+        </button>
         <button class="tab-btn" onclick="openTab('justifications')">
             <i class="fas fa-file-signature"></i> Justificatifs
         </button>
@@ -96,14 +111,15 @@
         <div class="notification">
             <i class="fas fa-info-circle"></i>
             <div class="notification-content">
-                <h4>Statistiques du Système</h4>
-                <p>
-                    Total étudiants: {{ stats.total_students }} | 
-                    Total professeurs: {{ stats.total_teachers }} | 
-                    Présences: {{ stats.total_present }} | 
-                    Absences: {{ stats.total_absent }} (dont {{ stats.total_justified }} justifiées)
-                </p>
-            </div>
+    <h4>Statistiques du Système</h4>
+    <p>
+        Total étudiants: {{ stats.total_students }} | 
+        Total professeurs: {{ stats.total_teachers }} | 
+        Présences: {{ stats.total_present }} | 
+        Absences: {{ stats.total_absent }} (dont {{ stats.total_justified }} justifiées)
+    </p>
+</div>
+            
         </div>
 
         <div class="dashboard-grid">
@@ -156,7 +172,7 @@
                         <tbody id="student-stats">
                             {% for student in absent_students %}
                             <tr>
-                                <td>{{ student.nom }} {{ student.prenom }} </td>
+                                <td>{{ student.nom }} {{ student.prenom }}</td>
                                 <td>{{ student.classe }}</td>
                                 <td>{{ student.absence_rate }}%</td>
                             </tr>
@@ -173,7 +189,7 @@
                 <h2><i class="fas fa-bell"></i> Alertes</h2>
                 {% for student in absent_students if student.absence_rate > 10 %}
                 <div class="notif">
-                    <i class="fas fa-exclamation-triangle"></i> Alerte : Taux d'absence élevé ({{ student.absence_rate }}%) pour {{ student.nom }} {{ student.prenom }}  ({{ student.classe }})
+                    <i class="fas fa-exclamation-triangle"></i> Alerte : Taux d'absence élevé ({{ student.absence_rate }}%) pour {{ student.nom }} {{ student.prenom }} ({{ student.classe }})
                 </div>
                 {% endfor %}
             </div>
@@ -212,7 +228,6 @@
                             <label>Prénom *</label>
                             <input type="text" name="prenom" required>
                         </div>
-                        
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -255,7 +270,6 @@
                             <th>Matricule</th>
                             <th>Nom</th>
                             <th>Prénom</th>
-                            
                             <th>Classe</th>
                             <th>Email</th>
                             <th>Téléphone</th>
@@ -268,7 +282,6 @@
                             <td>{{ student.matricule }}</td>
                             <td>{{ student.nom }}</td>
                             <td>{{ student.prenom }}</td>
-                            
                             <td>{{ student.classe }}</td>
                             <td>{{ student.email or '-' }}</td>
                             <td>{{ student.telephone or '-' }}</td>
@@ -283,7 +296,215 @@
                         </tr>
                         {% else %}
                         <tr>
-                           <td colspan="6" style="text-align: center;">Aucun élève trouvé</td>
+                           <td colspan="7" style="text-align: center;">Aucun élève trouvé</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Professors Management Tab -->
+    <div id="professors" class="tab-content">
+        <div class="management-section">
+            <div class="section-header">
+                <h2><i class="fas fa-chalkboard-teacher"></i> Gestion des Professeurs</h2>
+                <button class="btn" onclick="toggleAddForm('professor')">
+                    <i class="fas fa-plus"></i> Ajouter un Professeur
+                </button>
+            </div>
+
+            <div id="add-professor-form" class="add-form">
+                <h3>Ajouter un nouveau professeur</h3>
+                <form id="professor-form" onsubmit="return addProfessor(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Matricule *</label>
+                            <input type="text" name="matricule" required>
+                        </div>
+                        <div class="form-group">
+                            <label>NNI *</label>
+                            <input type="text" name="nni" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nom *</label>
+                            <input type="text" name="nom" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Prénom *</label>
+                            <input type="text" name="prenom" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" name="email">
+                        </div>
+                        <div class="form-group">
+                            <label>Téléphone</label>
+                            <input type="tel" name="telephone">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn">
+                            <i class="fas fa-save"></i> Enregistrer le professeur
+                        </button>
+                        <button type="button" class="btn danger" onclick="toggleAddForm('professor')">
+                            <i class="fas fa-times"></i> Annuler
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <input type="text" class="search-box" placeholder="Rechercher un professeur..." onkeyup="searchTable('professors-table', this.value)">
+            
+            <div class="table-container">
+                <table id="professors-table">
+                    <thead>
+                        <tr>
+                            <th>Matricule</th>
+                            <th>Nom</th>
+                            <th>Prénom</th>
+                            <th>Email</th>
+                            <th>Téléphone</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="professors-list">
+                        {% for professor in professors %}
+                        <tr data-id="{{ professor.id }}">
+                            <td>{{ professor.matricule }}</td>
+                            <td>{{ professor.nom }}</td>
+                            <td>{{ professor.prenom }}</td>
+                            <td>{{ professor.email or '-' }}</td>
+                            <td>{{ professor.telephone or '-' }}</td>
+                            <td>
+                                <button class="btn warning" onclick="editProfessor({{ professor.id }})">
+                                    <i class="fas fa-edit"></i> Modifier
+                                </button>
+                                <button class="btn danger" onclick="deleteProfessor({{ professor.id }})">
+                                    <i class="fas fa-trash"></i> Supprimer
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                           <td colspan="6" style="text-align: center;">Aucun professeur trouvé</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Courses Management Tab -->
+    <div id="courses" class="tab-content">
+        <div class="management-section">
+            <div class="section-header">
+                <h2><i class="fas fa-book"></i> Gestion des Cours</h2>
+                <button class="btn" onclick="toggleAddForm('course')">
+                    <i class="fas fa-plus"></i> Ajouter un Cours
+                </button>
+            </div>
+
+            <div id="add-course-form" class="add-form">
+                <h3>Ajouter un nouveau cours</h3>
+                <form id="course-form" onsubmit="return addCourse(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nom du cours *</label>
+                            <input type="text" name="nom_cours" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Code du cours</label>
+                            <input type="text" name="code_cours">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Professeur *</label>
+                            <select name="professeur_id" required>
+                                <option value="">Sélectionner un professeur</option>
+                                {% for professor in professors %}
+                                <option value="{{ professor.id }}">{{ professor.nom }} {{ professor.prenom }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Classe *</label>
+                            <select name="classe" required>
+                                <option value="">Sélectionner une classe</option>
+                                {% for class in classes %}
+                                <option value="{{ class }}">{{ class }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Crédits</label>
+                            <input type="number" name="credits" min="1" max="10">
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <textarea name="description" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn">
+                            <i class="fas fa-save"></i> Enregistrer le cours
+                        </button>
+                        <button type="button" class="btn danger" onclick="toggleAddForm('course')">
+                            <i class="fas fa-times"></i> Annuler
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <input type="text" class="search-box" placeholder="Rechercher un cours..." onkeyup="searchTable('courses-table', this.value)">
+            
+            <div class="table-container">
+                <table id="courses-table">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Code</th>
+                            <th>Professeur</th>
+                            <th>Classe</th>
+                            <th>Crédits</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="courses-list">
+                        {% for course in courses %}
+                        <tr data-id="{{ course.id }}">
+                            <td>{{ course.nom_cours }}</td>
+                            <td>{{ course.code_cours or '-' }}</td>
+                            <td>
+                                {% for professor in professors %}
+                                    {% if professor.id == course.professeur_id %}
+                                        {{ professor.nom }} {{ professor.prenom }}
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>{{ course.classe }}</td>
+                            <td>{{ course.credits or '-' }}</td>
+                            <td>
+                                <button class="btn warning" onclick="editCourse({{ course.id }})">
+                                    <i class="fas fa-edit"></i> Modifier
+                                </button>
+                                <button class="btn danger" onclick="deleteCourse({{ course.id }})">
+                                    <i class="fas fa-trash"></i> Supprimer
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                           <td colspan="6" style="text-align: center;">Aucun cours trouvé</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -295,7 +516,10 @@
     <!-- Justifications Tab -->
     <div id="justifications" class="tab-content">
         <div class="management-section">
-            <h2><i class="fas fa-file-signature"></i> Validation des Justificatifs</h2>
+            <div class="section-header">
+                <h2><i class="fas fa-file-signature"></i> Validation des Justificatifs</h2>
+            </div>
+            
             <div class="table-container">
                 <table id="justif-table">
                     <thead>
@@ -304,6 +528,7 @@
                             <th>Date</th>
                             <th>Motif</th>
                             <th>Cours</th>
+                            <th>Document</th>
                             <th>Statut</th>
                             <th>Commentaire</th>
                             <th>Action</th>
@@ -312,28 +537,55 @@
                     <tbody>
                         {% for justif in pending_justifications %}
                         <tr data-id="{{ justif.id }}">
-                            <td> {{ justif.eleve_nom }} {{ justif.eleve_prenom }}</td>
+                            <td>{{ justif.eleve_nom }} {{ justif.eleve_prenom }}</td>
                             <td>{{ justif.date_presence }}</td>
                             <td>{{ justif.reason_type }}</td>
                             <td>{{ justif.nom_cours }}</td>
-                            <td class="status-cell status-pending">En attente</td>
                             <td>
-                                <input class="comment-box" name="comment_{{ justif.id }}" 
-                                       placeholder="Ajouter un commentaire..." 
-                                       value="">
+                                {% if justif.document_path %}
+                                <button class="btn secondary" onclick="showDocument('{{ justif.document_path }}')">
+                                    <i class="fas fa-eye"></i> Voir
+                                </button>
+                                {% else %}
+                                Aucun document
+                                {% endif %}
+                            </td>
+                            <td class="status-cell status-{{ justif.status }}">
+                                {% if justif.status == 'en_attente' %}
+                                    En attente
+                                {% elif justif.status == 'validee' %}
+                                    Validé
+                                {% elif justif.status == 'refusee' %}
+                                    Rejeté
+                                {% else %}
+                                    {{ justif.status }}
+                                {% endif %}
                             </td>
                             <td>
-                                <button class="btn" onclick="validateJustif({{ justif.id }}, this)">
+                                <input type="text" class="comment-box" id="comment_{{ justif.id }}" 
+                                       placeholder="Ajouter un commentaire..." 
+                                       value="{{ justif.description or '' }}">
+                            </td>
+                            <td>
+                                {% if justif.status == 'en_attente' %}
+                                <button class="btn" onclick="validateJustif({{ justif.id }})">
                                     <i class="fas fa-check"></i> Valider
                                 </button>
-                                <button class="btn danger" onclick="rejectJustif({{ justif.id }}, this)">
+                                <button class="btn danger" onclick="rejectJustif({{ justif.id }})">
                                     <i class="fas fa-times"></i> Rejeter
                                 </button>
+                                {% else %}
+                                    {% if justif.status == 'validee' %}
+                                        <span class="status-approved">Validé</span>
+                                    {% else %}
+                                        <span class="status-rejected">Rejeté</span>
+                                    {% endif %}
+                                {% endif %}
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="7" style="text-align: center;">Aucun justificatif en attente</td>
+                            <td colspan="8" style="text-align: center;">Aucun justificatif en attente</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -342,16 +594,19 @@
         </div>
     </div>
 
-    <!-- Modal Dialog -->
-    <div id="modal" class="modal">
-        <div class="modal-content" id="modal-content"></div>
+    <!-- Document Viewer Modal -->
+    <div id="document-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeDocumentModal()">&times;</span>
+            <iframe id="document-frame" style="width:100%; height:80vh;"></iframe>
+        </div>
     </div>
 
     <script>
         // Global configuration
         const API_BASE = "{{ url_for('index') }}";
         const CSRF_TOKEN = "{{ session.csrf_token }}";
-
+        
         // Tab navigation
         function openTab(tabName) {
             const tabs = document.querySelectorAll('.tab-content');
@@ -381,165 +636,108 @@
             form.style.display = form.style.display === 'none' ? 'block' : 'none';
         }
 
-        // AJAX helper function
-        async function makeRequest(url, method = 'GET', data = null) {
-            const headers = {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': CSRF_TOKEN
-            };
-            
-            const config = {
-                method,
-                headers,
-                credentials: 'same-origin'
-            };
-            
-            if (data) {
-                config.body = JSON.stringify(data);
-            }
-            
-            try {
-                const response = await fetch(url, config);
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.message || `HTTP error! status: ${response.status}`);
-                }
-                return await response.json();
-            } catch (error) {
-                console.error('Request failed:', error);
-                showAlert(error.message || 'Erreur de connexion au serveur', 'error');
-                throw error;
-            }
+        // Document modal functions
+        function showDocument(documentPath) {
+            const frame = document.getElementById('document-frame');
+            frame.src = `/uploads/justifications/${documentPath}`;
+            document.getElementById('document-modal').style.display = 'block';
         }
 
-        // Student Management Functions
+        function closeDocumentModal() {
+            document.getElementById('document-modal').style.display = 'none';
+            document.getElementById('document-frame').src = '';
+        }
+
+        // Student functions
         async function addStudent(event) {
             event.preventDefault();
             const form = event.target;
             const formData = new FormData(form);
-            const data = Object.fromEntries(formData.entries());
             
             try {
-                const response = await makeRequest("{{ url_for('api_students') }}", 'POST', data);
-                if (response.success) {
-                    // Add new row to table
-                    const newRow = document.createElement('tr');
-                    newRow.setAttribute('data-id', response.id);
-                    newRow.innerHTML = `
-                        <td>${data.matricule}</td>
-                        <td>${data.nom}</td>
-                        <td>${data.prenom}</td>
-                        <td>${data.classe}</td>
-                        <td>${data.email || '-'}</td>
-                        <td>${data.telephone || '-'}</td>
-                        <td>
-                            <button class="btn warning" onclick="editStudent(${response.id})">
-                                <i class="fas fa-edit"></i> Modifier
-                            </button>
-                            <button class="btn danger" onclick="deleteStudent(${response.id})">
-                                <i class="fas fa-trash"></i> Supprimer
-                            </button>
-                        </td>
-                    `;
-                    document.getElementById('students-list').appendChild(newRow);
+                const response = await fetch('/api/students', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN
+                    },
+                    body: JSON.stringify(Object.fromEntries(formData))
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Élève ajouté avec succès!', 'success');
                     form.reset();
                     toggleAddForm('student');
-                    showAlert('Élève ajouté avec succès!', 'success');
+                    loadStudents();
+                } else {
+                    showAlert(result.error || "Erreur lors de l'ajout", 'error');
                 }
             } catch (error) {
-                showAlert(error.message || "Erreur lors de l'ajout de l'élève", 'error');
+                console.error('Add student error:', error);
+                showAlert("Erreur de connexion au serveur", 'error');
             }
-        }
-
-        // Create modal dialog
-        function createModal(title, fields, callback) {
-            const modal = document.getElementById('modal');
-            const modalContent = document.getElementById('modal-content');
-            
-            // Build form HTML
-            let formHTML = `<h3>${title}</h3><form id="modal-form">`;
-            
-            fields.forEach(field => {
-                formHTML += `<div class="form-group">
-                    <label>${field.label}</label>`;
-                
-                if (field.type === 'select') {
-                    formHTML += `<select name="${field.name}">`;
-                    field.options.forEach(option => {
-                        formHTML += `<option value="${option}" ${option === field.value ? 'selected' : ''}>${option}</option>`;
-                    });
-                    formHTML += `</select>`;
-                } else {
-                    formHTML += `<input type="${field.type || 'text'}" name="${field.name}" value="${field.value || ''}">`;
-                }
-                
-                formHTML += `</div>`;
-            });
-            
-            formHTML += `<div class="form-group">
-                <button type="submit" class="btn">Enregistrer</button>
-                <button type="button" class="btn danger" onclick="document.getElementById('modal').style.display='none'">Annuler</button>
-            </div></form>`;
-            
-            modalContent.innerHTML = formHTML;
-            modal.style.display = 'block';
-            
-            // Handle form submission
-            document.getElementById('modal-form').onsubmit = async (e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target);
-                const data = Object.fromEntries(formData.entries());
-                
-                try {
-                    await callback(data);
-                    modal.style.display = 'none';
-                } catch (error) {
-                    console.error(error);
-                }
-            };
         }
 
         async function editStudent(studentId) {
             try {
-                // Fetch current student data
-                const student = await makeRequest(`/api/students/${studentId}`);
+                const response = await fetch(`/api/student/${studentId}`);
+                const student = await response.json();
                 
-                const fields = [
-                    { label: 'Matricule', name: 'matricule', value: student.matricule },
-                    { label: 'NNI', name: 'nni', value: student.nni },
-                    { label: 'Prénom', name: 'prenom', value: student.prenom },
-                    { label: 'Nom', name: 'nom', value: student.nom },
-                    { 
-                        label: 'Classe', 
-                        name: 'classe', 
-                        type: 'select',
-                        options: JSON.parse('{{ classes|tojson }}'),
-                        value: student.classe 
-                    },
-                    { label: 'Email', name: 'email', value: student.email || '' },
-                    { label: 'Téléphone', name: 'telephone', value: student.telephone || '' }
-                ];
+                if (student.error) {
+                    showAlert(student.error, 'error');
+                    return;
+                }
                 
-                createModal('Modifier Élève', fields, async (data) => {
-                    try {
-                        const response = await makeRequest(`/api/students/${studentId}`, 'PUT', data);
-                        if (response.success) {
-                            const row = document.querySelector(`tr[data-id="${studentId}"]`);
-                            const cells = row.querySelectorAll('td');
-                            cells[0].textContent = data.matricule;
-                            cells[1].textContent = data.prenom;
-                            cells[2].textContent = data.nom;
-                            cells[3].textContent = data.classe;
-                            cells[4].textContent = data.email || '-';
-                            cells[5].textContent = data.telephone || '-';
-                            showAlert('Élève modifié avec succès!', 'success');
-                        }
-                    } catch (error) {
-                        showAlert(error.message || "Erreur lors de la modification de l'élève", 'error');
-                    }
-                });
+                const form = document.getElementById('student-form');
+                form.querySelector('[name="matricule"]').value = student.matricule;
+                form.querySelector('[name="nni"]').value = student.nni;
+                form.querySelector('[name="nom"]').value = student.nom;
+                form.querySelector('[name="prenom"]').value = student.prenom;
+                form.querySelector('[name="classe"]').value = student.classe;
+                form.querySelector('[name="email"]').value = student.email || '';
+                form.querySelector('[name="telephone"]').value = student.telephone || '';
+                
+                form.dataset.id = studentId;
+                form.onsubmit = updateStudent;
+                
+                document.getElementById('add-student-form').style.display = 'block';
             } catch (error) {
-                showAlert(error.message || "Erreur lors du chargement des données de l'élève", 'error');
+                console.error('Edit student error:', error);
+                showAlert("Erreur lors du chargement des données", 'error');
+            }
+        }
+
+        async function updateStudent(event) {
+            event.preventDefault();
+            const form = event.target;
+            const studentId = form.dataset.id;
+            const formData = new FormData(form);
+            
+            try {
+                const response = await fetch(`/api/students/${studentId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN
+                    },
+                    body: JSON.stringify(Object.fromEntries(formData))
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Élève modifié avec succès!', 'success');
+                    form.reset();
+                    toggleAddForm('student');
+                    loadStudents();
+                } else {
+                    showAlert(result.error || "Erreur lors de la modification", 'error');
+                }
+            } catch (error) {
+                console.error('Update student error:', error);
+                showAlert("Erreur de connexion au serveur", 'error');
             }
         }
 
@@ -547,70 +745,466 @@
             if (!confirm('Êtes-vous sûr de vouloir supprimer cet élève?')) return;
             
             try {
-                const response = await makeRequest(`/api/students/${studentId}`, 'DELETE');
-                if (response.success) {
-                    document.querySelector(`tr[data-id="${studentId}"]`).remove();
+                const response = await fetch(`/api/students/${studentId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': CSRF_TOKEN
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
                     showAlert('Élève supprimé avec succès!', 'success');
+                    loadStudents();
+                } else {
+                    showAlert(result.error || "Erreur lors de la suppression", 'error');
                 }
             } catch (error) {
-                showAlert(error.message || "Erreur lors de la suppression de l'élève", 'error');
+                console.error('Delete student error:', error);
+                showAlert("Erreur de connexion au serveur", 'error');
             }
         }
 
-        // Justification Management
-        async function validateJustif(justifId, btn) {
-            const row = btn.closest('tr');
-            const comment = row.querySelector('.comment-box').value;
+        async function loadStudents() {
+            try {
+                const response = await fetch('/api/students');
+                const students = await response.json();
+                
+                const tbody = document.getElementById('students-list');
+                tbody.innerHTML = '';
+                
+                if (students.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Aucun élève trouvé</td></tr>';
+                    return;
+                }
+                
+                students.forEach(student => {
+                    const row = document.createElement('tr');
+                    row.dataset.id = student.id;
+                    row.innerHTML = `
+                        <td>${student.matricule}</td>
+                        <td>${student.nom}</td>
+                        <td>${student.prenom}</td>
+                        <td>${student.classe}</td>
+                        <td>${student.email || '-'}</td>
+                        <td>${student.telephone || '-'}</td>
+                        <td>
+                            <button class="btn warning" onclick="editStudent(${student.id})">
+                                <i class="fas fa-edit"></i> Modifier
+                            </button>
+                            <button class="btn danger" onclick="deleteStudent(${student.id})">
+                                <i class="fas fa-trash"></i> Supprimer
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Load students error:', error);
+                showAlert("Erreur lors du chargement des élèves", 'error');
+            }
+        }
+
+        // Professor functions
+        async function addProfessor(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
             
             try {
-                const response = await makeRequest(`/api/justifications/${justifId}`, 'PUT', {
-                    status: 'validee',
-                    comment: comment
+                const response = await fetch('/api/professors', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN
+                    },
+                    body: JSON.stringify(Object.fromEntries(formData))
                 });
                 
-                if (response.success) {
-                    const statusCell = row.querySelector('.status-cell');
-                    statusCell.textContent = 'Validé';
-                    statusCell.className = 'status-cell status-approved';
-                    row.querySelector('td:last-child').innerHTML = '<span style="color: #27ae60;"><i class="fas fa-check-circle"></i> Validé</span>';
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Professeur ajouté avec succès!', 'success');
+                    form.reset();
+                    toggleAddForm('professor');
+                    loadProfessors();
+                } else {
+                    showAlert(result.error || "Erreur lors de l'ajout", 'error');
+                }
+            } catch (error) {
+                console.error('Add professor error:', error);
+                showAlert("Erreur de connexion au serveur", 'error');
+            }
+        }
+
+        async function editProfessor(professorId) {
+            try {
+                const response = await fetch(`/api/professor/${professorId}`);
+                const professor = await response.json();
+                
+                if (professor.error) {
+                    showAlert(professor.error, 'error');
+                    return;
+                }
+                
+                const form = document.getElementById('professor-form');
+                form.querySelector('[name="matricule"]').value = professor.matricule;
+                form.querySelector('[name="nni"]').value = professor.nni;
+                form.querySelector('[name="nom"]').value = professor.nom;
+                form.querySelector('[name="prenom"]').value = professor.prenom;
+                form.querySelector('[name="email"]').value = professor.email || '';
+                form.querySelector('[name="telephone"]').value = professor.telephone || '';
+                
+                form.dataset.id = professorId;
+                form.onsubmit = updateProfessor;
+                
+                document.getElementById('add-professor-form').style.display = 'block';
+            } catch (error) {
+                console.error('Edit professor error:', error);
+                showAlert("Erreur lors du chargement des données", 'error');
+            }
+        }
+
+        async function updateProfessor(event) {
+            event.preventDefault();
+            const form = event.target;
+            const professorId = form.dataset.id;
+            const formData = new FormData(form);
+            
+            try {
+                const response = await fetch(`/api/professor/${professorId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN
+                    },
+                    body: JSON.stringify(Object.fromEntries(formData))
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Professeur modifié avec succès!', 'success');
+                    form.reset();
+                    toggleAddForm('professor');
+                    loadProfessors();
+                } else {
+                    showAlert(result.error || "Erreur lors de la modification", 'error');
+                }
+            } catch (error) {
+                console.error('Update professor error:', error);
+                showAlert("Erreur de connexion au serveur", 'error');
+            }
+        }
+
+        async function deleteProfessor(professorId) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer ce professeur?')) return;
+            
+            try {
+                const response = await fetch(`/api/professor/${professorId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': CSRF_TOKEN
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Professeur supprimé avec succès!', 'success');
+                    loadProfessors();
+                } else {
+                    showAlert(result.error || "Erreur lors de la suppression", 'error');
+                }
+            } catch (error) {
+                console.error('Delete professor error:', error);
+                showAlert("Erreur de connexion au serveur", 'error');
+            }
+        }
+
+        async function loadProfessors() {
+            try {
+                const response = await fetch('/api/professors');
+                const professors = await response.json();
+                
+                const tbody = document.getElementById('professors-list');
+                tbody.innerHTML = '';
+                
+                if (professors.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Aucun professeur trouvé</td></tr>';
+                    return;
+                }
+                
+                professors.forEach(professor => {
+                    const row = document.createElement('tr');
+                    row.dataset.id = professor.id;
+                    row.innerHTML = `
+                        <td>${professor.matricule}</td>
+                        <td>${professor.nom}</td>
+                        <td>${professor.prenom}</td>
+                        <td>${professor.email || '-'}</td>
+                        <td>${professor.telephone || '-'}</td>
+                        <td>
+                            <button class="btn warning" onclick="editProfessor(${professor.id})">
+                                <i class="fas fa-edit"></i> Modifier
+                            </button>
+                            <button class="btn danger" onclick="deleteProfessor(${professor.id})">
+                                <i class="fas fa-trash"></i> Supprimer
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Load professors error:', error);
+                showAlert("Erreur lors du chargement des professeurs", 'error');
+            }
+        }
+
+        // Course functions
+        async function addCourse(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            
+            try {
+                const response = await fetch('/api/courses', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN
+                    },
+                    body: JSON.stringify(Object.fromEntries(formData))
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Cours ajouté avec succès!', 'success');
+                    form.reset();
+                    toggleAddForm('course');
+                    loadCourses();
+                } else {
+                    showAlert(result.error || "Erreur lors de l'ajout", 'error');
+                }
+            } catch (error) {
+                console.error('Add course error:', error);
+                showAlert("Erreur de connexion au serveur", 'error');
+            }
+        }
+
+        async function editCourse(courseId) {
+            try {
+                const response = await fetch(`/api/course/${courseId}`);
+                const course = await response.json();
+                
+                if (course.error) {
+                    showAlert(course.error, 'error');
+                    return;
+                }
+                
+                const form = document.getElementById('course-form');
+                form.querySelector('[name="nom_cours"]').value = course.nom_cours;
+                form.querySelector('[name="code_cours"]').value = course.code_cours || '';
+                form.querySelector('[name="professeur_id"]').value = course.professeur_id || '';
+                form.querySelector('[name="classe"]').value = course.classe;
+                form.querySelector('[name="credits"]').value = course.credits || '';
+                form.querySelector('[name="description"]').value = course.description || '';
+                
+                form.dataset.id = courseId;
+                form.onsubmit = updateCourse;
+                
+                document.getElementById('add-course-form').style.display = 'block';
+            } catch (error) {
+                console.error('Edit course error:', error);
+                showAlert("Erreur lors du chargement des données", 'error');
+            }
+        }
+
+        async function updateCourse(event) {
+            event.preventDefault();
+            const form = event.target;
+            const courseId = form.dataset.id;
+            const formData = new FormData(form);
+            
+            try {
+                const response = await fetch(`/api/course/${courseId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN
+                    },
+                    body: JSON.stringify(Object.fromEntries(formData))
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Cours modifié avec succès!', 'success');
+                    form.reset();
+                    toggleAddForm('course');
+                    loadCourses();
+                } else {
+                    showAlert(result.error || "Erreur lors de la modification", 'error');
+                }
+            } catch (error) {
+                console.error('Update course error:', error);
+                showAlert("Erreur de connexion au serveur", 'error');
+            }
+        }
+
+        async function deleteCourse(courseId) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer ce cours?')) return;
+            
+            try {
+                const response = await fetch(`/api/course/${courseId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': CSRF_TOKEN
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showAlert('Cours supprimé avec succès!', 'success');
+                    loadCourses();
+                } else {
+                    showAlert(result.error || "Erreur lors de la suppression", 'error');
+                }
+            } catch (error) {
+                console.error('Delete course error:', error);
+                showAlert("Erreur de connexion au serveur", 'error');
+            }
+        }
+
+        async function loadCourses() {
+            try {
+                const response = await fetch('/api/courses');
+                const courses = await response.json();
+                
+                const tbody = document.getElementById('courses-list');
+                tbody.innerHTML = '';
+                
+                if (courses.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Aucun cours trouvé</td></tr>';
+                    return;
+                }
+                
+                courses.forEach(course => {
+                    const row = document.createElement('tr');
+                    row.dataset.id = course.id;
+                    row.innerHTML = `
+                        <td>${course.nom_cours}</td>
+                        <td>${course.code_cours || '-'}</td>
+                        <td>${course.prof_nom || ''} ${course.prof_prenom || ''}</td>
+                        <td>${course.classe}</td>
+                        <td>${course.credits || '-'}</td>
+                        <td>
+                            <button class="btn warning" onclick="editCourse(${course.id})">
+                                <i class="fas fa-edit"></i> Modifier
+                            </button>
+                            <button class="btn danger" onclick="deleteCourse(${course.id})">
+                                <i class="fas fa-trash"></i> Supprimer
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Load courses error:', error);
+                showAlert("Erreur lors du chargement des cours", 'error');
+            }
+        }
+
+        // Justification functions
+        async function validateJustif(justifId) {
+            try {
+                const row = document.querySelector(`tr[data-id="${justifId}"]`);
+                const comment = row.querySelector('.comment-box').value;
+
+                const response = await fetch(`/api/justifications/${justifId}/update_status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN
+                    },
+                    body: JSON.stringify({
+                        status: 'validee',
+                        comment: comment
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Update the row
+                    row.querySelector('.status-cell').textContent = 'Validé';
+                    row.querySelector('.status-cell').className = 'status-cell status-validee';
+                    
+                    // Remove action buttons
+                    const actionCell = row.querySelector('td:last-child');
+                    actionCell.innerHTML = '<span class="status-approved">Validé</span>';
+                    
                     showAlert('Justificatif validé avec succès!', 'success');
+                } else {
+                    showAlert(result.error || "Erreur lors de la validation", 'error');
                 }
             } catch (error) {
-                showAlert(error.message || "Erreur lors de la validation du justificatif", 'error');
+                console.error('Validation error:', error);
+                showAlert("Erreur de connexion au serveur", 'error');
             }
         }
 
-        async function rejectJustif(justifId, btn) {
-            const row = btn.closest('tr');
-            const comment = row.querySelector('.comment-box').value;
-            
-            if (!comment.trim()) {
-                showAlert('Veuillez ajouter un commentaire pour le rejet.', 'warning');
-                return;
-            }
-            
+        async function rejectJustif(justifId) {
             try {
-                const response = await makeRequest(`/api/justifications/${justifId}`, 'PUT', {
-                    status: 'refusee',
-                    comment: comment
+                const row = document.querySelector(`tr[data-id="${justifId}"]`);
+                const comment = row.querySelector('.comment-box').value;
+
+                if (!comment.trim()) {
+                    showAlert('Veuillez ajouter un commentaire pour le rejet.', 'warning');
+                    row.querySelector('.comment-box').focus();
+                    return;
+                }
+
+                const response = await fetch(`/api/justifications/${justifId}/update_status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': CSRF_TOKEN
+                    },
+                    body: JSON.stringify({
+                        status: 'refusee',
+                        comment: comment
+                    })
                 });
-                
-                if (response.success) {
-                    const statusCell = row.querySelector('.status-cell');
-                    statusCell.textContent = 'Rejeté';
-                    statusCell.className = 'status-cell status-rejected';
-                    row.querySelector('td:last-child').innerHTML = '<span style="color: #e74c3c;"><i class="fas fa-times-circle"></i> Rejeté</span>';
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Update the row
+                    row.querySelector('.status-cell').textContent = 'Rejeté';
+                    row.querySelector('.status-cell').className = 'status-cell status-refusee';
+                    
+                    // Remove action buttons
+                    const actionCell = row.querySelector('td:last-child');
+                    actionCell.innerHTML = '<span class="status-rejected">Rejeté</span>';
+                    
                     showAlert('Justificatif rejeté avec succès!', 'success');
+                } else {
+                    showAlert(result.error || "Erreur lors du rejet", 'error');
                 }
             } catch (error) {
-                showAlert(error.message || "Erreur lors du rejet du justificatif", 'error');
+                console.error('Rejection error:', error);
+                showAlert("Erreur de connexion au serveur", 'error');
             }
         }
 
         // Helper function to show alerts
         function showAlert(message, type = 'info') {
             const alertDiv = document.createElement('div');
-            alertDiv.className = `flash-${type}`;
+            alertDiv.className = `flash-${type === 'error' ? 'error' : type === 'success' ? 'success' : 'warning'}`;
             alertDiv.innerHTML = `
                 <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
                 ${message}
@@ -630,7 +1224,7 @@
             
             // Data from backend
             const classes = JSON.parse('{{ classes|tojson }}');
-            const absenceRates = JSON.parse('{{ absence_rates|tojson }}');
+            const absenceRates = JSON.parse('{{ class_stats|tojson }}');
             
             new Chart(ctx, {
                 type: 'bar',
@@ -661,9 +1255,9 @@
 
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('modal');
+            const modal = document.getElementById('document-modal');
             if (event.target == modal) {
-                modal.style.display = "none";
+                closeDocumentModal();
             }
         }
 

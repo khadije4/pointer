@@ -15,7 +15,24 @@
             flex-direction: column;
             height: 100vh;
         }
-
+.error-field {
+            border-color: #ff6b6b !important;
+        }
+        .field-error {
+            color: #ff6b6b;
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
+        }
+        .alert {
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+        }
+        .alert-error {
+            background-color: #ffebee;
+            border-left: 4px solid #ff6b6b;
+            color: #c62828;
+        }
         .container {
             background-color: #fff;
             border-radius: 30px;
